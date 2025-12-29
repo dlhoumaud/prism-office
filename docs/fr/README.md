@@ -14,7 +14,7 @@
 
 ## 🎯 Qu'est-ce que c'est ?
 
-PrismOffice est une **interface web autonome** pour gérer les scénarios [prism-bundle](https://github.com/dlhoumaud/prism-office). Elle fournit une interface moderne avec thème sombre pour :
+PrismOffice est une **interface web autonome** pour gérer les scénarios [prism-bundle](https://github.com/dlhoumaud/prism-bundle). Elle fournit une interface moderne avec thème sombre pour :
 
 - 📋 **Lister** tous les scénarios disponibles
 - ✨ **Créer** de nouveaux scénarios YAML avec le constructeur visuel

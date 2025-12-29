@@ -14,7 +14,7 @@
 
 ## 🎯 What is it?
 
-PrismOffice is a **standalone web interface** for managing [prism-bundle](https://github.com/dlhoumaud/prism-office) scenarios. It provides a clean, dark-themed UI to:
+PrismOffice is a **standalone web interface** for managing [prism-bundle](https://github.com/dlhoumaud/prism-bundle) scenarios. It provides a clean, dark-themed UI to:
 
 - 📋 **List** all available scenarios
 - ✨ **Create** new YAML scenarios with visual builder
