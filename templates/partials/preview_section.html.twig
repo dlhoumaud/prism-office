@@ -1,0 +1,18 @@
+        <!-- Preview Section -->
+        <div class="section" id="previewSection" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0;">👁️ YAML Editor</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn" onclick="updatePreview()" title="Refresh YAML from builder">
+                        🔄 Builder → YAML
+                    </button>
+                    <button class="btn btn-add" onclick="applyYamlToBuilder()" title="Apply YAML changes to builder">
+                        ⬅️ YAML → Builder
+                    </button>
+                </div>
+            </div>
+            <p class="text-muted" style="font-size: 12px; margin-bottom: 10px;">
+                ✏️ Edit YAML directly or use the builder. Click "YAML → Builder" to sync changes back to the form.
+            </p>
+            <textarea id="yamlPreview" class="yaml-preview yaml-editor" spellcheck="false">Click "Builder → YAML" to see the generated YAML</textarea>
+        </div>

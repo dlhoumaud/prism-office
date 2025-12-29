@@ -1,0 +1,28 @@
+<div class="section">
+    <h2>{{ title }}</h2>
+
+    {% if button_text is defined and button_onclick is defined %}
+        <button class="btn btn-add" onclick="{{ button_onclick }}">{{ button_text }}</button>
+    {% endif %}
+    {% if extra_button is defined %}
+        <button class="btn btn-add" onclick="{{ extra_button.onclick }}" style="{{ extra_button.style }}">{{ extra_button.text }}</button>
+    {% endif %}
+    {% if extra_input is defined %}
+        <input 
+            type="{{ extra_input.type }}" 
+            id="{{ extra_input.id }}" 
+            class="input-field" 
+            placeholder="{{ extra_input.placeholder }}" 
+            value="{{ extra_input.value }}"
+            {% if extra_input.readonly is defined and extra_input.readonly %}readonly{% endif %}
+            {% if extra_input.required is defined and extra_input.required %}required{% endif %}
+            {% if extra_input.pattern is defined %}pattern="{{ extra_input.pattern }}"{% endif %}
+        >
+    {% endif %}
+    {% if container_id is defined %}
+        <div id="{{ container_id }}" class="items-container"></div>
+    {% endif %}
+    {% if extra_info is defined %}
+        <small>{{ extra_info }}</small>
+    {% endif %}
+</div>

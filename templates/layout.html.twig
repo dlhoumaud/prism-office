@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Prism Office{% endblock %}</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: #2d2d2d;
+            border-bottom: 3px solid #4a9eff;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: #4a9eff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header .logo {
+            font-size: 2rem;
+        }
+
+        .nav {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav a {
+            color: #b0b0b0;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav a:hover {
+            background: #3a3a3a;
+            color: #4a9eff;
+        }
+
+        .nav a.active {
+            background: #4a9eff;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+
+        .alert-success {
+            background: #1a3a1a;
+            border-color: #4caf50;
+            color: #8bc34a;
+        }
+
+        .alert-error {
+            background: #3a1a1a;
+            border-color: #f44336;
+            color: #ff6b6b;
+        }
+
+        .card {
+            background: #2d2d2d;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .card-header {
+            border-bottom: 2px solid #3a3a3a;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header h2 {
+            color: #4a9eff;
+            font-size: 1.3rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th {
+            background: #3a3a3a;
+            color: #4a9eff;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #3a3a3a;
+        }
+
+        table tr:hover {
+            background: #333;
+        }
+
+        code {
+            background: #1a1a1a;
+            color: #4a9eff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-family: "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-scope {
+            background: #4a9eff;
+            color: #fff;
+        }
+
+        .badge-count {
+            background: #ff9800;
+            color: #fff;
+        }
+
+        input[type="text"] {
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            color: #e0e0e0;
+            padding: 0.5rem;
+            border-radius: 4px;
+            width: 100%;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        .scope-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .scope-container input[type="text"] {
+            width: 180px;
+            padding: 0.4rem 0.6rem;
+        }
+
+        button, .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #4a9eff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #3a8eef;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: #fff;
+        }
+
+        .btn-warning:hover {
+            background: #e68900;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+
+        .btn-small {
+            padding: 0.3rem 0.7rem;
+            font-size: 0.85rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .text-muted {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            table {
+                font-size: 0.9em;
+            }
+        }
+    </style>
+
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span class="logo">🔮</span>
+            Prism Office
+        </h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="scope-container">
+                <label for="global-scope" style="color: #4a9eff; font-weight: 600; margin-right: 0.5rem;">🎯 Scope:</label>
+                <input 
+                    type="text" 
+                    id="global-scope" 
+                    value="{{ app.session.get('prism_scope', default_scope) }}" 
+                    placeholder="e.g., dev_rick_sanchez"
+                    style="width: 180px; display: inline-block;"
+                    pattern="[a-z0-9_\-]+"
+                    oninput="this.value = this.value.toLowerCase(); validateScope(this);"
+                    onchange="updateGlobalScope(this.value)"
+                />
+            </div>
+            <nav class="nav">
+                <a href="{{ (target_folder is defined and target_folder is not empty) ? path('prism_office_directory', {path: target_folder}) : path('prism_office_list') }}" class="{% if app.request.get('_route') in ['prism_office_list', 'prism_office_directory'] %}active{% endif %}">
+                    📋 Scenarios
+                </a>
+                <a href="{{ path('prism_office_loaded') }}" class="{% if app.request.get('_route') == 'prism_office_loaded' %}active{% endif %}">
+                    🚀 Loaded
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container">
+        {% for message in app.flashes('success') %}
+            <div class="alert alert-success">
+                ✓ {{ message }}
+            </div>
+        {% endfor %}
+
+        {% for message in app.flashes('error') %}
+            <div class="alert alert-error">
+                ✗ {{ message }}
+            </div>
+        {% endfor %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <div class="footer">
+        <p>Prism Office v1.0 - Development Tool</p>
+    </div>
+
+    <script>
+        // Validation du scope : ajoute un underscore si que des chiffres
+        function validateScope(input) {
+            let value = input.value;
+            const isOnlyDigits = /^\d+$/.test(value);
+            const isValid = /^[a-z0-9_\-]+$/.test(value);
+            
+            // Si que des chiffres, ajouter un underscore au début
+            if (value && isOnlyDigits) {
+                input.value = '_' + value;
+                value = input.value;
+            }
+            
+            // Vérifier les caractères autorisés
+            if (value && !isValid) {
+                input.setCustomValidity('Caractères autorisés : lettres minuscules, chiffres, _ et -');
+            } else {
+                input.setCustomValidity('');
+            }
+        }
+
+        // Fonction pour obtenir le scope global
+        function getGlobalScope() {
+            return document.getElementById('global-scope')?.value || 'default';
+        }
+
+        // Fonction pour mettre à jour le scope global et la session
+        function updateGlobalScope(value) {
+            fetch('{{ path('prism_office_update_scope') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'scope=' + encodeURIComponent(value)
+            });
+        }
+
+        // Synchroniser tous les formulaires avec le scope global
+        document.addEventListener('DOMContentLoaded', function() {
+            // Intercepter tous les formulaires de load/purge
+            document.querySelectorAll('form[action*="load"], form[action*="purge"]').forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const scopeInput = this.querySelector('input[name="scope"]');
+                    // Ne pas remplacer le scope sur la page 'loaded' car chaque scénario a son propre scope
+                    if (scopeInput && !scopeInput.hasAttribute('data-keep-scope')) {
+                        scopeInput.value = getGlobalScope();
+                    }
+                });
+            });
+        });
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

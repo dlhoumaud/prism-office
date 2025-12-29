@@ -1,0 +1,367 @@
+{% extends '@PrismOffice/layout.html.twig' %}
+
+{% block title %}Scenarios - Prism Office{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>📋 Available Scenarios</h2>
+        </div>
+
+        {# Breadcrumb navigation #}
+        {% if breadcrumb|length > 0 %}
+            <div style="padding: 1rem; background: #1a1a2e; border-bottom: 1px solid #2a2a3a;">
+                <nav style="display: flex; align-items: center; color: #b0b0b0;">
+                    {% for item in breadcrumb %}
+                        {% if loop.last %}
+                            <span style="color: #4a9eff; font-weight: bold;">{{ item.name }}</span>
+                        {% else %}
+                            {% if item.path is null %}
+                                <a href="{{ path('prism_office_list') }}" style="color: #4a9eff; text-decoration: none;">{{ item.name }}</a>
+                            {% else %}
+                                <a href="{{ path('prism_office_directory', {path: item.path}) }}" style="color: #4a9eff; text-decoration: none;">{{ item.name }}</a>
+                            {% endif %}
+                            <span style="margin: 0 0.5rem;">/</span>
+                        {% endif %}
+                    {% endfor %}
+                </nav>
+            </div>
+        {% endif %}
+
+        {# Section YAML Files #}
+        <div style="margin-top: 1rem;">
+            <h3 style="color: #4a9eff; padding: 1rem; background: #1a1a2e; border-radius: 4px 4px 0 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                <span>📑 YAML Scenarios</span>
+                <div>
+                    <button 
+                        class="btn btn-secondary" 
+                        onclick="createFolder()" 
+                        style="margin-right: 10px; background: #4a6fa5; padding: 0.5rem 1rem; font-size: 0.9rem;"
+                    >
+                        📁 Create Folder
+                    </button>
+                    <a href="{{ path('prism_office_create', {folder: current_path}) }}" class="btn btn-primary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                        ✨ Create New Scenario
+                    </a>
+                </div>
+            </h3>
+            {% if yaml_folders|length > 0 or yaml_files|length > 0 %}
+                <table style="margin-top: 0;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th style="width: 300px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {# Afficher les dossiers YAML en PREMIER #}
+                        {% for folder in yaml_folders %}
+                            <tr style="background: #252535;">
+                                <td>
+                                    <a 
+                                        href="{{ path('prism_office_directory', {path: current_path ? current_path ~ '/' ~ folder : folder}) }}" 
+                                        style="color: #ffd700; text-decoration: none; font-weight: bold;"
+                                    >
+                                        📁 {{ folder }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="actions">
+                                        <a 
+                                            href="{{ path('prism_office_directory', {path: current_path ? current_path ~ '/' ~ folder : folder}) }}" 
+                                            class="btn btn-primary btn-small"
+                                        >
+                                            📂 Open
+                                        </a>
+                                        <form method="POST" action="{{ path('prism_office_delete_folder') }}" style="display:inline;">
+                                            <input type="hidden" name="folder_path" value="{{ current_path ? current_path ~ '/' ~ folder : folder }}">
+                                            <button 
+                                                type="submit" 
+                                                class="btn btn-danger btn-small"
+                                                onclick="return confirm('⚠️ Delete folder \"{{ folder }}\"? (must be empty)');"
+                                                style="background: #8b0000;"
+                                            >
+                                                🗑️ Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+
+                        {# Fichiers YAML #}
+                        {% for scenario in yaml_files %}
+                            {% set full_scenario_path = current_path ? current_path ~ '/' ~ scenario : scenario %}
+                            <tr>
+                                <td>📑 <code><a href="{{ path('prism_office_create', {edit: full_scenario_path}) }}" title="Edit YAML" style="color: inherit; text-decoration: none;">{{ scenario }}</a></code></td>
+                                <td>
+                                    <div class="actions">
+                                        <form method="POST" action="{{ path('prism_office_load') }}" style="display:inline;">
+                                            <input type="hidden" name="scenario_name" value="{{ full_scenario_path }}">
+                                            <input type="hidden" name="scope">
+                                            <input type="hidden" name="current_path" value="{{ current_path }}">
+                                            <button type="submit" class="btn btn-success btn-small">
+                                                ▶ Load
+                                            </button>
+                                        </form>
+                                        
+                                        <form method="POST" action="{{ path('prism_office_purge') }}" style="display:inline;">
+                                            <input type="hidden" name="scenario_name" value="{{ full_scenario_path }}">
+                                            <input type="hidden" name="scope">
+                                            <input type="hidden" name="current_path" value="{{ current_path }}">
+                                            <button 
+                                                type="submit" 
+                                                class="btn btn-danger btn-small"
+                                                onclick="return confirm('Are you sure you want to purge this scenario?');"
+                                            >
+                                                🗑️ Purge
+                                            </button>
+                                        </form>
+
+                                        {# <a 
+                                            href="{{ path('prism_office_create', {edit: full_scenario_path}) }}" 
+                                            class="btn btn-warning btn-small"
+                                            title="Edit YAML"
+                                        >
+                                            ✏️ Edit
+                                        </a> #}
+                                        
+                                        <form method="POST" action="{{ path('prism_office_delete') }}" style="display:inline;">
+                                            <input type="hidden" name="scenario_name" value="{{ full_scenario_path }}">
+                                            <input type="hidden" name="current_path" value="{{ current_path }}">
+                                            <button 
+                                                type="submit" 
+                                                class="btn btn-danger btn-small"
+                                                onclick="return confirm('⚠️ DELETE file \"{{ scenario }}\"? Cannot be undone!');"
+                                                style="background: #8b0000;"
+                                            >
+                                                🗑️ Delete
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted" style="padding: 1rem;">No YAML scenarios in this folder.</p>
+            {% endif %}
+        </div>
+
+        {# Section PHP Files (lecture seule) #}
+        <div style="margin-top: 2rem;">
+            <h3 style="color: #9370db; padding: 1rem; background: #1a1a2e; border-radius: 4px 4px 0 0; margin: 0;">
+                🐘 PHP Scenarios
+            </h3>
+            {% if php_folders|length > 0 or php_files|length > 0 %}
+                <table style="margin-top: 0;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Classname</th>
+                            <th style="width: 250px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {# Afficher les dossiers PHP en PREMIER (lecture seule) #}
+                        {% for folder in php_folders %}
+                            <tr style="background: #2a2535;">
+                                <td>
+                                    <a 
+                                        href="{{ path('prism_office_directory', {path: current_path ? current_path ~ '/' ~ folder : folder}) }}" 
+                                        style="color: #9370db; text-decoration: none; font-weight: bold;"
+                                    >
+                                        📁 {{ folder }}
+                                    </a>
+                                </td>
+                                <td></td>
+                                <td>
+                                    <div class="actions">
+                                        <a 
+                                            href="{{ path('prism_office_directory', {path: current_path ? current_path ~ '/' ~ folder : folder}) }}" 
+                                            class="btn btn-primary btn-small"
+                                        >
+                                            📂 Open
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+
+                        {# Fichiers PHP enregistrés (utiliser php_scenarios pour avoir le vrai nom) #}
+                        {% if current_path == '' %}
+                            {# À la racine, afficher uniquement les scénarios PHP dans App\Prism (pas les sous-namespaces) #}
+                            {% for scenario in php_scenarios %}
+                                {# Skip pure YAML scenarios et les scénarios dans des sous-namespaces #}
+                                {% if scenario.className != 'Prism\\Application\\Prism\\YamlPrism' and scenario.className starts with 'App\\Prism\\' and not ('\\' in scenario.className|slice(10)) %}
+                                <tr>
+                                    <td>🐘 <code>{{ scenario.name }}</code></td>
+                                    <td><span class="text-muted">{{ scenario.className }}</span></td>
+                                    <td>
+                                        <div class="actions">
+                                            <form method="POST" action="{{ path('prism_office_load') }}" style="display:inline;">
+                                                <input type="hidden" name="scenario_name" value="{{ scenario.name }}">
+                                                <input type="hidden" name="scope">
+                                                <input type="hidden" name="current_path" value="{{ current_path }}">
+                                                <button type="submit" class="btn btn-success btn-small">
+                                                    ▶ Load
+                                                </button>
+                                            </form>
+                                            
+                                            <form method="POST" action="{{ path('prism_office_purge') }}" style="display:inline;">
+                                                <input type="hidden" name="scenario_name" value="{{ scenario.name }}">
+                                                <input type="hidden" name="scope">
+                                                <input type="hidden" name="current_path" value="{{ current_path }}">
+                                                <button 
+                                                    type="submit" 
+                                                    class="btn btn-danger btn-small"
+                                                    onclick="return confirm('Are you sure you want to purge this scenario?');"
+                                                >
+                                                    🗑️ Purge
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            {% set expected_namespace = 'App\\Prism\\' ~ current_path|replace({'/' : '\\'}) ~ '\\' %}
+                            {% for scenario in php_scenarios %}
+                                {% if scenario.className starts with expected_namespace %}
+                                <tr>
+                                    <td>🐘 <code>{{ scenario.name }}</code></td>
+                                    <td><span class="text-muted">{{ scenario.className }}</span></td>
+                                    <td>
+                                        <div class="actions">
+                                            <form method="POST" action="{{ path('prism_office_load') }}" style="display:inline;">
+                                                <input type="hidden" name="scenario_name" value="{{ scenario.name }}">
+                                                <input type="hidden" name="scope">
+                                                <input type="hidden" name="current_path" value="{{ current_path }}">
+                                                <button type="submit" class="btn btn-success btn-small">
+                                                    ▶ Load
+                                                </button>
+                                            </form>
+                                            
+                                            <form method="POST" action="{{ path('prism_office_purge') }}" style="display:inline;">
+                                                <input type="hidden" name="scenario_name" value="{{ scenario.name }}">
+                                                <input type="hidden" name="scope">
+                                                <input type="hidden" name="current_path" value="{{ current_path }}">
+                                                <button 
+                                                    type="submit" 
+                                                    class="btn btn-danger btn-small"
+                                                    onclick="return confirm('Are you sure you want to purge this scenario?');"
+                                                >
+                                                    🗑️ Purge
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-muted" style="padding: 1rem;">No PHP scenarios in this folder.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if loadedScenarios|length > 0 %}
+        <div class="card">
+            <div class="card-header">
+                <h2>🚀 Currently Loaded Scenarios</h2>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Scenario</th>
+                        <th>Scope</th>
+                        <th>Resources</th>
+                        <th style="width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loaded in loadedScenarios %}
+                        <tr>
+                            <td>🚀 <code>{{ loaded.scenarioName }}</code></td>
+                            <td><span class="badge badge-scope">{{ loaded.scope }}</span></td>
+                            <td>
+                                <span class="badge badge-count">{{ loaded.resourceCount }} resources</span>
+                            </td>
+                            <td>
+                                <a 
+                                    href="{{ path('prism_office_resources', {name: loaded.scenarioName, scope: loaded.scope}) }}" 
+                                    class="btn btn-primary btn-small"
+                                >
+                                    👁️ View
+                                </a>
+
+                                <form method="POST" action="{{ path('prism_office_purge') }}" style="display:inline;">
+                                    <input type="hidden" name="scenario_name" value="{{ loaded.scenarioName }}">
+                                    <input type="hidden" name="scope" value="{{ loaded.scope }}" data-keep-scope>
+                                    <input type="hidden" name="current_path" value="{{ current_path }}">
+                                    <button 
+                                        type="submit" 
+                                        class="btn btn-danger btn-small"
+                                        onclick="return confirm('Are you sure you want to purge this scenario?');"
+                                    >
+                                        🗑️ Purge
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    <div class="card" style="background: #2a2a3a;">
+        <h3 style="color: #4a9eff; margin-bottom: 1rem;">💡 Quick Guide</h3>
+        <ul style="line-height: 2; color: #b0b0b0;">
+            <li><strong>Scope</strong>: Unique identifier for your data context (e.g., <code>dev_yourname</code>)</li>
+            <li><strong>Load</strong>: Creates scenario data in the database (auto-purges existing data first)</li>
+            <li><strong>Purge</strong>: Removes all scenario data for the specified scope</li>
+            <li><strong>Resources</strong>: View detailed list of created database records</li>
+        </ul>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function createFolder() {
+        const folderName = prompt('📁 Enter folder name:');
+        if (!folderName) {
+            return;
+        }
+
+        // Vérifier que le nom est valide (pas de caractères interdits)
+        if (!/^[a-zA-Z0-9_-]+$/.test(folderName)) {
+            alert('❌ Invalid folder name. Use only letters, numbers, underscores and hyphens.');
+            return;
+        }
+
+        const currentPath = '{{ current_path|e('js') }}';
+        const folderPath = currentPath ? currentPath + '/' + folderName : folderName;
+
+        // Créer le formulaire pour soumettre
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ path('prism_office_create_folder') }}';
+
+        const inputPath = document.createElement('input');
+        inputPath.type = 'hidden';
+        inputPath.name = 'folder_path';
+        inputPath.value = folderPath;
+        form.appendChild(inputPath);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,164 @@
+        <!-- Placeholders Reference -->
+        <div class="section" id="placeholdersSection" style="display: none;">
+            <h2>📚 Placeholders Reference</h2>
+            <div id="placeholdersReference" style="display: block; margin-top: 15px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h3 style="color: #61dafb; margin-bottom: 10px;">🔧 Placeholders</h3>
+                        <div class="reference-list">
+                            <code>{{ '{{' }} scope {{ '}}' }}</code> - Current scope<br>
+                            <code>{{ '{{' }} uuid {{ '}}' }}</code> - Generate UUID v4<br>
+                            <code>{{ '{{' }} hash('password') {{ '}}' }}</code> - Hash password with bcrypt<br>
+                            <code>{{ '{{' }} now {{ '}}' }}</code> - Current timestamp<br>
+                            <code>{{ '{{' }} date('+7 days') {{ '}}' }}</code> - Relative date (+1 day, -1 week, next monday)<br>
+                            <code>{{ '{{' }} env('VAR') {{ '}}' }}</code> - Environment variable<br>
+                            <code>{{ '{{' }} math(10*2) {{ '}}' }}</code> - Math expression (+, -, *, /, %, parentheses)<br>
+                            <code>{{ '{{' }} $variable {{ '}}' }}</code> - Use custom variable<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Pipes (transformers):</strong><br>
+                            <code>{{ '{{' }} uuid|truncate(8) {{ '}}' }}</code> - Limit length<br>
+                            <code>{{ '{{' }} scope|uppercase {{ '}}' }}</code> - UPPERCASE<br>
+                            <code>{{ '{{' }} scope|lowercase {{ '}}' }}</code> - lowercase<br>
+                            <code>{{ '{{' }} text|trim {{ '}}' }}</code> - Remove spaces<br>
+                            <code>{{ '{{' }} uuid|replace('-', '') {{ '}}' }}</code> - Replace string<br>
+                            <code>{{ '{{' }} uuid|base64 {{ '}}' }}</code> - Encode to Base64<br>
+                            <code>{{ '{{' }} scope|md5 {{ '}}' }}</code> - MD5 hash<br>
+                            <code>{{ '{{' }} scope|sha1 {{ '}}' }}</code> - SHA-1 hash<br>
+                            <code>{{ '{{' }} text|htmlencode {{ '}}' }}</code> - HTML encode (XSS protection)<br>
+                            <code>{{ '{{' }} scope|urlencode {{ '}}' }}</code> - URL encode<br>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="color: #61dafb; margin-bottom: 10px;">🎲 Fake Data Generators</h3>
+                        <div class="reference-list">
+                            <strong>Identity:</strong><br>
+                            <code>{{ '{{' }} fake(user) {{ '}}' }}</code> - Username<br>
+                            <code>{{ '{{' }} fake(email) {{ '}}' }}</code> - Email<br>
+                            <code>{{ '{{' }} fake(firstname) {{ '}}' }}</code> - First name<br>
+                            <code>{{ '{{' }} fake(lastname) {{ '}}' }}</code> - Last name<br>
+                            <code>{{ '{{' }} fake(fullname) {{ '}}' }}</code> - Full name<br>
+                            <code>{{ '{{' }} fake(company) {{ '}}' }}</code> - Company name<br>
+                            <code>{{ '{{' }} fake(gender) {{ '}}' }}</code> - Gender<br>
+                            <code>{{ '{{' }} fake(age) {{ '}}' }}</code> - Age (18-99)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Address:</strong><br>
+                            <code>{{ '{{' }} fake(postcode) {{ '}}' }}</code> - Postal code (FR default)<br>
+                            <code>{{ '{{' }} fake(postcode, 'US') {{ '}}' }}</code> - US ZIP<br>
+                            <code>{{ '{{' }} fake(postcode, 'GB') {{ '}}' }}</code> - UK postcode<br>
+                            <code>{{ '{{' }} fake(street) {{ '}}' }}</code> - Street (FR default)<br>
+                            <code>{{ '{{' }} fake(street, 'DE') {{ '}}' }}</code> - German street<br>
+                            <code>{{ '{{' }} fake(city) {{ '}}' }}</code> - City (FR default)<br>
+                            <code>{{ '{{' }} fake(city, 'ES') {{ '}}' }}</code> - Spanish city<br>
+                            <code>{{ '{{' }} fake(address) {{ '}}' }}</code> - Address without country<br>
+                            <code>{{ '{{' }} fake(address, 'IT') {{ '}}' }}</code> - Italian address (no country)<br>
+                            <code>{{ '{{' }} fake(fulladdress) {{ '}}' }}</code> - Complete address + country (FR)<br>
+                            <code>{{ '{{' }} fake(fulladdress, 'GB') {{ '}}' }}</code> - UK address + country<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Dates & Numbers:</strong><br>
+                            <code>{{ '{{' }} fake(date) {{ '}}' }}</code> - Random date<br>
+                            <code>{{ '{{' }} fake(date, 'Y-m-d', '2020-01-01', '2025-12-31') {{ '}}' }}</code> - Date in range<br>
+                            <code>{{ '{{' }} fake(datetime) {{ '}}' }}</code> - Random datetime<br>
+                            <code>{{ '{{' }} fake(datetime, 'Y-m-d H:i:s', '2024-01-01', '2024-12-31') {{ '}}' }}</code> - DateTime in range<br>
+                            <code>{{ '{{' }} fake(timestamp) {{ '}}' }}</code> - Unix timestamp (int)<br>
+                            <code>{{ '{{' }} fake(timestamp, '2024-01-01', '2024-12-31') {{ '}}' }}</code> - Timestamp in range<br>
+                            <code>{{ '{{' }} fake(microtime) {{ '}}' }}</code> - Microtime (float)<br>
+                            <code>{{ '{{' }} fake(microtime, '2024-01-01', '2024-12-31') {{ '}}' }}</code> - Microtime in range<br>
+                            <code>{{ '{{' }} fake(number) {{ '}}' }}</code> - Random number (1-100)<br>
+                            <code>{{ '{{' }} fake(number, 10, 99) {{ '}}' }}</code> - Number in range<br>
+                            <code>{{ '{{' }} fake(boolean) {{ '}}' }}</code> - Boolean (0 or 1)<br>
+                            <code>{{ '{{' }} fake(BOOLEAN) {{ '}}' }}</code> - Boolean (false or true)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Codes:</strong><br>
+                            <code>{{ '{{' }} fake(isbn) {{ '}}' }}</code> - ISBN-13 number<br>
+                            <code>{{ '{{' }} fake(ean13) {{ '}}' }}</code> - EAN-13 barcode<br>
+                            <code>{{ '{{' }} fake(vin) {{ '}}' }}</code> - Vehicle ID Number<br>
+                            <code>{{ '{{' }} fake(ssn) {{ '}}' }}</code> - Social Security Number (US)<br>
+                            <code>{{ '{{' }} fake(nir) {{ '}}' }}</code> - NIR (French SSN)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Text & Files:</strong><br>
+                            <code>{{ '{{' }} fake(text) {{ '}}' }}</code> - Lorem ipsum text<br>
+                            <code>{{ '{{' }} fake(text, 50) {{ '}}' }}</code> - Text with N chars<br>
+                            <code>{{ '{{' }} fake(pathfile) {{ '}}' }}</code> - File path<br>
+                            <code>{{ '{{' }} fake(pathfile, 'pdf') {{ '}}' }}</code> - File with extension<br>
+                            <code>{{ '{{' }} fake(mime) {{ '}}' }}</code> - MIME type<br>
+                            <code>{{ '{{' }} fake(charset) {{ '}}' }}</code> - Character encoding<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Network:</strong><br>
+                            <code>{{ '{{' }} fake(url) {{ '}}' }}</code> - URL<br>
+                            <code>{{ '{{' }} fake(ip) {{ '}}' }}</code> - IP v4<br>
+                            <code>{{ '{{' }} fake(ipv6) {{ '}}' }}</code> - IP v6<br>
+                            <code>{{ '{{' }} fake(mac) {{ '}}' }}</code> - MAC address<br>
+                            <code>{{ '{{' }} fake(tel) {{ '}}' }}</code> - Phone number<br>
+                            <code>{{ '{{' }} fake(useragent) {{ '}}' }}</code> - User-Agent string<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Location:</strong><br>
+                            <code>{{ '{{' }} fake(gps) {{ '}}' }}</code> - GPS coordinates (lat, long)<br>
+                            <code>{{ '{{' }} fake(latitude) {{ '}}' }}</code> - Latitude only<br>
+                            <code>{{ '{{' }} fake(longitude) {{ '}}' }}</code> - Longitude only<br>
+                            <code>{{ '{{' }} fake(country) {{ '}}' }}</code> - Country name<br>
+                            <code>{{ '{{' }} fake(iso) {{ '}}' }}</code> - ISO country code (FR, US, DE...)<br>
+                            <code>{{ '{{' }} fake(iso, 'alpha3') {{ '}}' }}</code> - ISO alpha3 (FRA, USA, DEU...)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Payment:</strong><br>
+                            <code>{{ '{{' }} fake(creditcard) {{ '}}' }}</code> - Credit card (masked)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Finance:</strong><br>
+                            <code>{{ '{{' }} fake(iban) {{ '}}' }}</code> - IBAN (France default)<br>
+                            <code>{{ '{{' }} fake(iban, 'FR') {{ '}}' }}</code> - IBAN France<br>
+                            <code>{{ '{{' }} fake(iban, 'DE') {{ '}}' }}</code> - IBAN Germany<br>
+                            <code>{{ '{{' }} fake(iban, 'GB') {{ '}}' }}</code> - IBAN UK<br>
+                            <code>{{ '{{' }} fake(siren) {{ '}}' }}</code> - SIREN (9 digits)<br>
+                            <code>{{ '{{' }} fake(siret) {{ '}}' }}</code> - SIRET (14 digits)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Crypto:</strong><br>
+                            <code>{{ '{{' }} fake(crypto) {{ '}}' }}</code> - Bitcoin address (default)<br>
+                            <code>{{ '{{' }} fake(crypto, 'btc') {{ '}}' }}</code> - Bitcoin address<br>
+                            <code>{{ '{{' }} fake(crypto, 'eth') {{ '}}' }}</code> - Ethereum address<br>
+                            <code>{{ '{{' }} fake(crypto, 'xrp') {{ '}}' }}</code> - Ripple address<br>
+                            <code>{{ '{{' }} fake(crypto, 'sol') {{ '}}' }}</code> - Solana address<br>
+                            <code>{{ '{{' }} fake(crypto, 'ltc') {{ '}}' }}</code> - Litecoin address<br>
+                            <code>{{ '{{' }} fake(crypto, 'doge') {{ '}}' }}</code> - Dogecoin address<br>
+                            <code>{{ '{{' }} fake(crypto, 'ada') {{ '}}' }}</code> - Cardano address<br>
+                            <code>{{ '{{' }} fake(crypto, 'dot') {{ '}}' }}</code> - Polkadot address<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Colors:</strong><br>
+                            <code>{{ '{{' }} fake(color) {{ '}}' }}</code> - Color name (red, blue...)<br>
+                            <code>{{ '{{' }} fake(hexcolor) {{ '}}' }}</code> - Hex color (#A3F2C1)<br>
+                            <code>{{ '{{' }} fake(rgb) {{ '}}' }}</code> - RGB color (rgb(255, 128, 0))<br>
+                            <code>{{ '{{' }} fake(rgba) {{ '}}' }}</code> - RGBA color (rgba(255, 128, 0, 0.5))<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Slugs:</strong><br>
+                            <code>{{ '{{' }} fake(slug) {{ '}}' }}</code> - URL slug (auto)<br>
+                            <code>{{ '{{' }} fake(slug, 'My Title') {{ '}}' }}</code> - Slugify text<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Devices:</strong><br>
+                            <code>{{ '{{' }} fake(device) {{ '}}' }}</code> - Device name<br>
+                            <code>{{ '{{' }} fake(device, 'symbol') {{ '}}' }}</code> - Device symbol<br>
+                            <code>{{ '{{' }} fake(fulldevice) {{ '}}' }}</code> - Full device name<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Currencies:</strong><br>
+                            <code>{{ '{{' }} fake(currency) {{ '}}' }}</code> - Random currency (EUR, USD...)<br>
+                            <code>{{ '{{' }} fake(currency, 'symbol') {{ '}}' }}</code> - Random symbol (€, $...)<br>
+                            <code>{{ '{{' }} fake(currency, 'eur') {{ '}}' }}</code> - Currency code (EUR)<br>
+                            <code>{{ '{{' }} fake(currency, 'fr') {{ '}}' }}</code> - From country (FR → EUR)<br>
+                            <code>{{ '{{' }} fake(currency, 'eur', 'symbol') {{ '}}' }}</code> - Symbol (€)<br>
+                            <code>{{ '{{' }} fake(currency, 'us', 'symbol') {{ '}}' }}</code> - Symbol from country (US → $)<br>
+                            <code>{{ '{{' }} fake(fullcurrency) {{ '}}' }}</code> - Full currency name<br>
+                            <code>{{ '{{' }} fake(fullcurrency, 'eur') {{ '}}' }}</code> - Full name (Euro)<br>
+                            <code>{{ '{{' }} fake(fullcurrency, 'us') {{ '}}' }}</code> - From country (US Dollar)<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>JSON:</strong><br>
+                            <code>{{ '{{' }} fake(json, 'int, int, int') {{ '}}' }}</code> - [42, 57, 89]<br>
+                            <code>{{ '{{' }} fake(json, 'string, string') {{ '}}' }}</code> - ["lorem", "ipsum"]<br>
+                            <code>{{ '{{' }} fake(json, 'id:int, name:string') {{ '}}' }}</code> - {"id":42, "name":"lorem"}<br>
+                            <code>{{ '{{' }} fake(json, 'user:{id:int, email:email}') {{ '}}' }}</code> - Nested object<br>
+                            <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+                            <strong>Serialize (PHP):</strong><br>
+                            <code>{{ '{{' }} fake(serialize, 'int, int, int') {{ '}}' }}</code> - a:3:{i:0;i:42;i:1;i:57;i:2;i:89;}<br>
+                            <code>{{ '{{' }} fake(serialize, 'id:int, name:string') {{ '}}' }}</code> - a:2:{s:2:"id";i:42;s:4:"name";s:5:"lorem";}<br>
+                            <code>{{ '{{' }} fake(serialize, 'user:{id:int, email:email}') {{ '}}' }}</code> - Nested serialized<br>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>

@@ -1,0 +1,2614 @@
+<script>
+// Conteurs globaux
+let importCounter = 0;
+let variableCounter = 0;
+let loadCounter = 0;
+let purgeCounter = 0;
+let fieldCounter = 0;
+
+// Target folder for saving (if creating from a subdirectory)
+const targetFolder = {{ target_folder|default('')|json_encode|raw }};
+
+// Scénarios existants pour les imports
+const existingScenarios = {{ existing_scenarios|json_encode|raw }};
+
+// Database schema for autocomplete
+const tablesWithColumns = {{ tables_with_columns|json_encode|raw }};
+const databaseAliases = {{ database_aliases|json_encode|raw }};
+
+// Determine if tablesWithColumns is multi-database or single database
+// Multi-DB structure: { "default": { "users": [...] }, "hexagonal_secondary": { "other": [...] } }
+// Single-DB structure: { "users": [...], "posts": [...] }
+const isMultiDatabase = tablesWithColumns && Object.keys(tablesWithColumns).length > 0 && 
+    Object.values(tablesWithColumns)[0] && 
+    typeof Object.values(tablesWithColumns)[0] === 'object' && 
+    !Array.isArray(Object.values(tablesWithColumns)[0]);
+
+const tableNames = isMultiDatabase 
+    ? Object.keys(tablesWithColumns['default'] || tablesWithColumns[Object.keys(tablesWithColumns)[0]] || {})
+    : Object.keys(tablesWithColumns);
+
+// Autocomplete data
+const placeholders = [
+    { category: 'Basic', code: 'scope', description: 'Current scope' },
+    { category: 'Basic', code: 'uuid', description: 'Generate UUID v4' },
+    { category: 'Basic', code: 'now', description: 'Current timestamp' },
+    { category: 'Functions', code: "hash('password')", description: 'Hash with bcrypt' },
+    { category: 'Functions', code: "date('+7 days')", description: 'Relative date' },
+    { category: 'Functions', code: "env('VAR')", description: 'Environment variable' },
+    { category: 'Functions', code: "math(10*2)", description: 'Math expression' },
+    { category: 'Pipes', code: 'uuid|truncate(8)', description: 'Limit length' },
+    { category: 'Pipes', code: 'scope|uppercase', description: 'UPPERCASE' },
+    { category: 'Pipes', code: 'scope|lowercase', description: 'lowercase' },
+    { category: 'Pipes', code: 'text|trim', description: 'Remove spaces' },
+    { category: 'Pipes', code: "uuid|replace('-', '')", description: 'Replace string' },
+    { category: 'Pipes', code: 'uuid|base64', description: 'Encode to Base64' },
+    { category: 'Pipes', code: 'scope|md5', description: 'MD5 hash' },
+    { category: 'Pipes', code: 'scope|sha1', description: 'SHA-1 hash' },
+    { category: 'Pipes', code: 'text|htmlencode', description: 'HTML encode (XSS protection)' },
+    { category: 'Pipes', code: 'scope|urlencode', description: 'URL encode' },
+    { category: 'Fake - Identity', code: 'fake(user)', description: 'Username' },
+    { category: 'Fake - Identity', code: 'fake(email)', description: 'Email address' },
+    { category: 'Fake - Identity', code: 'fake(firstname)', description: 'First name' },
+    { category: 'Fake - Identity', code: 'fake(lastname)', description: 'Last name' },
+    { category: 'Fake - Identity', code: 'fake(fullname)', description: 'Full name (firstname + lastname)' },
+    { category: 'Fake - Identity', code: 'fake(company)', description: 'Company name' },
+    { category: 'Fake - Identity', code: 'fake(gender)', description: 'Gender (male, female, other)' },
+    { category: 'Fake - Identity', code: 'fake(age)', description: 'Age (18-99)' },
+    { category: 'Fake - Address', code: 'fake(postcode)', description: 'Postal code (France default)' },
+    { category: 'Fake - Address', code: "fake(postcode, 'US')", description: 'US ZIP code' },
+    { category: 'Fake - Address', code: "fake(postcode, 'GB')", description: 'UK postcode' },
+    { category: 'Fake - Address', code: 'fake(street)', description: 'Street address (France default)' },
+    { category: 'Fake - Address', code: "fake(street, 'US')", description: 'US street address' },
+    { category: 'Fake - Address', code: 'fake(city)', description: 'City name (France default)' },
+    { category: 'Fake - Address', code: "fake(city, 'DE')", description: 'German city' },
+    { category: 'Fake - Address', code: 'fake(address)', description: 'Address without country (France default)' },
+    { category: 'Fake - Address', code: "fake(address, 'GB')", description: 'UK address without country' },
+    { category: 'Fake - Address', code: 'fake(fulladdress)', description: 'Complete address with country (France default)' },
+    { category: 'Fake - Address', code: "fake(fulladdress, 'IT')", description: 'Italian complete address with country' },
+    { category: 'Fake - Dates', code: 'fake(date)', description: 'Random date' },
+    { category: 'Fake - Dates', code: "fake(date, 'Y-m-d', '2020-01-01', '2025-12-31')", description: 'Date in range' },
+    { category: 'Fake - Dates', code: 'fake(datetime)', description: 'Random datetime' },
+    { category: 'Fake - Dates', code: "fake(datetime, 'Y-m-d H:i:s', '2024-01-01', '2024-12-31')", description: 'DateTime in range' },
+    { category: 'Fake - Dates', code: 'fake(timestamp)', description: 'Unix timestamp (int)' },
+    { category: 'Fake - Dates', code: "fake(timestamp, '2024-01-01', '2024-12-31')", description: 'Timestamp in range' },
+    { category: 'Fake - Dates', code: 'fake(microtime)', description: 'Microtime (float with microseconds)' },
+    { category: 'Fake - Dates', code: "fake(microtime, '2024-01-01', '2024-12-31')", description: 'Microtime in range' },
+    { category: 'Fake - Numbers', code: 'fake(number)', description: 'Random number 1-100' },
+    { category: 'Fake - Numbers', code: 'fake(number, 10, 99)', description: 'Number in range' },
+    { category: 'Fake - Numbers', code: 'fake(boolean)', description: 'Boolean (0 or 1)' },
+    { category: 'Fake - Numbers', code: 'fake(BOOLEAN)', description: 'Boolean (false or true)' },
+    { category: 'Fake - Codes', code: 'fake(isbn)', description: 'ISBN-13 number' },
+    { category: 'Fake - Codes', code: 'fake(ean13)', description: 'EAN-13 barcode' },
+    { category: 'Fake - Codes', code: 'fake(vin)', description: 'Vehicle Identification Number' },
+    { category: 'Fake - Codes', code: 'fake(ssn)', description: 'Social Security Number (US)' },
+    { category: 'Fake - Codes', code: 'fake(nir)', description: 'NIR (French SSN)' },
+    { category: 'Fake - Text', code: 'fake(text)', description: 'Lorem ipsum text' },
+    { category: 'Fake - Text', code: 'fake(text, 50)', description: 'Text with N chars' },
+    { category: 'Fake - Files', code: 'fake(pathfile)', description: 'File path' },
+    { category: 'Fake - Files', code: "fake(pathfile, 'pdf')", description: 'File with extension' },
+    { category: 'Fake - Files', code: 'fake(mime)', description: 'MIME type' },
+    { category: 'Fake - Files', code: 'fake(charset)', description: 'Character encoding' },
+    { category: 'Fake - Network', code: 'fake(url)', description: 'URL' },
+    { category: 'Fake - Network', code: 'fake(ip)', description: 'IP v4' },
+    { category: 'Fake - Network', code: 'fake(ipv6)', description: 'IP v6' },
+    { category: 'Fake - Network', code: 'fake(mac)', description: 'MAC address' },
+    { category: 'Fake - Network', code: 'fake(tel)', description: 'Phone number' },
+    { category: 'Fake - Network', code: 'fake(useragent)', description: 'User-Agent string' },
+    { category: 'Fake - Location', code: 'fake(gps)', description: 'GPS coordinates (lat, long)' },
+    { category: 'Fake - Location', code: 'fake(latitude)', description: 'Latitude only' },
+    { category: 'Fake - Location', code: 'fake(longitude)', description: 'Longitude only' },
+    { category: 'Fake - Location', code: 'fake(country)', description: 'Country name' },
+    { category: 'Fake - Location', code: 'fake(iso)', description: 'ISO country code (alpha2)' },
+    { category: 'Fake - Location', code: "fake(iso, 'alpha3')", description: 'ISO country code (alpha3)' },
+    { category: 'Fake - Payment', code: 'fake(creditcard)', description: 'Credit card (masked)' },
+    { category: 'Fake - Finance', code: 'fake(iban)', description: 'IBAN (France default)' },
+    { category: 'Fake - Finance', code: "fake(iban, 'FR')", description: 'IBAN France' },
+    { category: 'Fake - Finance', code: "fake(iban, 'DE')", description: 'IBAN Germany' },
+    { category: 'Fake - Finance', code: "fake(iban, 'GB')", description: 'IBAN UK' },
+    { category: 'Fake - Finance', code: 'fake(siren)', description: 'SIREN (9 digits)' },
+    { category: 'Fake - Finance', code: 'fake(siret)', description: 'SIRET (14 digits)' },
+    { category: 'Fake - Crypto', code: 'fake(crypto)', description: 'Bitcoin address (default)' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'btc')", description: 'Bitcoin address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'eth')", description: 'Ethereum address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'xrp')", description: 'Ripple address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'sol')", description: 'Solana address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'ltc')", description: 'Litecoin address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'doge')", description: 'Dogecoin address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'ada')", description: 'Cardano address' },
+    { category: 'Fake - Crypto', code: "fake(crypto, 'dot')", description: 'Polkadot address' },
+    { category: 'Fake - Colors', code: 'fake(color)', description: 'Color name (red, blue...)' },
+    { category: 'Fake - Colors', code: 'fake(hexcolor)', description: 'Hex color (#A3F2C1)' },
+    { category: 'Fake - Colors', code: 'fake(rgb)', description: 'RGB color (rgb(255, 128, 0))' },
+    { category: 'Fake - Colors', code: 'fake(rgba)', description: 'RGBA color (rgba(255, 128, 0, 0.5))' },
+    { category: 'Fake - Text', code: 'fake(slug)', description: 'URL slug (auto-generated)' },
+    { category: 'Fake - Text', code: "fake(slug, 'My Title')", description: 'URL slug (from text)' },
+    { category: 'Fake - Devices', code: 'fake(device)', description: 'Device name (iPhone, Galaxy S23, MacBook...)' },
+    { category: 'Fake - Devices', code: "fake(device, 'symbol')", description: 'Device symbol (📱, 💻, ⌚...)' },
+    { category: 'Fake - Devices', code: 'fake(fulldevice)', description: 'Full device name (Apple iPhone 15 Pro Max...)' },
+    { category: 'Fake - Currencies', code: 'fake(currency)', description: 'Currency code random (EUR, USD, GBP...)' },
+    { category: 'Fake - Currencies', code: "fake(currency, 'symbol')", description: 'Currency symbol random (€, £...)' },
+    { category: 'Fake - Currencies', code: "fake(currency, 'eur')", description: 'Specific currency code (EUR)' },
+    { category: 'Fake - Currencies', code: "fake(currency, 'fr')", description: 'Currency from country code (FR → EUR)' },
+    { category: 'Fake - Currencies', code: "fake(currency, 'eur', 'symbol')", description: 'Specific currency symbol (€)' },
+    { category: 'Fake - Currencies', code: "fake(currency, 'us', 'symbol')", description: 'Currency symbol from country' },
+    { category: 'Fake - Currencies', code: 'fake(fullcurrency)', description: 'Full currency name (Euro, US Dollar...)' },
+    { category: 'Fake - Currencies', code: "fake(fullcurrency, 'eur')", description: 'Specific full currency (Euro)' },
+    { category: 'Fake - Currencies', code: "fake(fullcurrency, 'us')", description: 'Full name from country (US Dollar)' },
+    { category: 'Fake - JSON', code: "fake(json, 'int, int, int')", description: 'JSON array [42, 57, 89]' },
+    { category: 'Fake - JSON', code: "fake(json, 'string, string')", description: 'JSON array ["lorem", "ipsum"]' },
+    { category: 'Fake - JSON', code: "fake(json, 'id:int, name:string')", description: 'JSON object {id, name}' },
+    { category: 'Fake - JSON', code: "fake(json, 'user:{id:int, email:email}')", description: 'Nested JSON object' },
+    { category: 'Fake - Serialize', code: "fake(serialize, 'int, int, int')", description: 'PHP serialized array' },
+    { category: 'Fake - Serialize', code: "fake(serialize, 'id:int, name:string')", description: 'Serialized object a:2:{...}' },
+    { category: 'Fake - Serialize', code: "fake(serialize, 'user:{id:int, email:email}')", description: 'Nested serialized data' },
+];
+
+let autocompleteState = {
+    activeInput: null,
+    activeIndex: -1,
+    startPos: 0,
+    container: null
+};
+
+// Cache for import variables
+let importVariablesCache = {};
+let importVariablesCacheTimestamp = 0;
+
+// Debounce function pour éviter trop d'appels
+let debounceTimer;
+function debounce(func, delay = 500) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(func, delay);
+}
+
+// Auto-update preview on changes
+function setupAutoUpdate() {
+    // Update on any input change
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('input-field') || 
+            e.target.id === 'scenarioName' ||
+            e.target.classList.contains('import-select')) {
+            debounce(updatePreview, 300);
+        }
+    });
+
+    // Update on select change
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('input-field')) {
+            debounce(updatePreview, 300);
+        }
+    });
+
+    // Initial preview
+    setTimeout(updatePreview, 100);
+}
+
+// Setup autocomplete
+function setupAutocomplete() {
+    // Create autocomplete container
+    const container = document.createElement('div');
+    container.className = 'autocomplete-container';
+    container.id = 'autocomplete';
+    document.body.appendChild(container);
+    autocompleteState.container = container;
+    
+    // Listen for input on all text fields
+    document.addEventListener('input', handleAutocompleteInput);
+    document.addEventListener('focus', handleAutocompleteFocus, true);
+    document.addEventListener('keydown', handleAutocompleteKeydown);
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.autocomplete-container') && !e.target.classList.contains('input-field')) {
+            hideAutocomplete();
+        }
+    });
+}
+
+function handleAutocompleteFocus(e) {
+    if (!e.target.classList.contains('input-field')) return;
+    
+    const autocompleteType = e.target.dataset.autocomplete;
+    if (autocompleteType === 'table' || autocompleteType === 'column' || autocompleteType === 'database') {
+        const value = e.target.value.trim();
+        showDatabaseAutocomplete(e.target, value, autocompleteType);
+    }
+}
+
+function handleAutocompleteInput(e) {
+    if (!e.target.classList.contains('input-field')) return;
+    
+    // Check if it's a database autocomplete field
+    const autocompleteType = e.target.dataset.autocomplete;
+    if (autocompleteType === 'table' || autocompleteType === 'column' || autocompleteType === 'database') {
+        const value = e.target.value.trim();
+        showDatabaseAutocomplete(e.target, value, autocompleteType);
+        return;
+    }
+    
+    const input = e.target;
+    const value = input.value;
+    const cursorPos = input.selectionStart;
+    
+    // Check if user typed {{ '{{' }}
+    const beforeCursor = value.substring(0, cursorPos);
+    const lastOpenBraces = beforeCursor.lastIndexOf('{{ '{{' }}');
+    const lastCloseBraces = beforeCursor.lastIndexOf('{{ '}}' }}');
+    
+    if (lastOpenBraces > lastCloseBraces && lastOpenBraces !== -1) {
+        // User is inside {{ '{{' }} {{ '}}' }}
+        const query = beforeCursor.substring(lastOpenBraces + 2).trim();
+        autocompleteState.activeInput = input;
+        autocompleteState.startPos = lastOpenBraces + 2;
+        showAutocomplete(input, query);
+    } else {
+        hideAutocomplete();
+    }
+}
+
+function handleAutocompleteKeydown(e) {
+    const container = autocompleteState.container;
+    if (container.style.display === 'none') return;
+    
+    const items = container.querySelectorAll('.autocomplete-item');
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        autocompleteState.activeIndex = Math.min(autocompleteState.activeIndex + 1, items.length - 1);
+        updateActiveItem(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        autocompleteState.activeIndex = Math.max(autocompleteState.activeIndex - 1, 0);
+        updateActiveItem(items);
+    } else if (e.key === 'Enter' && autocompleteState.activeIndex >= 0) {
+        e.preventDefault();
+        items[autocompleteState.activeIndex].click();
+    } else if (e.key === 'Escape') {
+        hideAutocomplete();
+    }
+}
+
+function updateActiveItem(items) {
+    items.forEach((item, index) => {
+        item.classList.toggle('active', index === autocompleteState.activeIndex);
+    });
+    if (items[autocompleteState.activeIndex]) {
+        items[autocompleteState.activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+}
+
+// Fetch variables from imported files
+async function fetchImportVariables() {
+    const imports = [];
+    document.querySelectorAll('[data-import-path]').forEach(importInput => {
+        const path = importInput.value.trim();
+        if (path) {
+            imports.push(path);
+        }
+    });
+
+    // If no imports, return empty
+    if (imports.length === 0) {
+        return {};
+    }
+
+    // Check cache (valid for 5 seconds)
+    const now = Date.now();
+    if (importVariablesCacheTimestamp > 0 && (now - importVariablesCacheTimestamp) < 5000) {
+        return importVariablesCache;
+    }
+
+    try {
+        const response = await fetch('/prism/create/import-vars', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ imports })
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch import variables');
+            return {};
+        }
+
+        const data = await response.json();
+        importVariablesCache = data.variables || {};
+        importVariablesCacheTimestamp = now;
+        
+        return importVariablesCache;
+    } catch (error) {
+        console.error('Error fetching import variables:', error);
+        return {};
+    }
+}
+
+// Invalidate import variables cache when imports change
+function invalidateImportCache() {
+    importVariablesCache = {};
+    importVariablesCacheTimestamp = 0;
+}
+
+async function showAutocomplete(input, query) {
+    const container = autocompleteState.container;
+    container.innerHTML = '';
+
+    // Créer une liste dynamique incluant les variables
+    const dynamicPlaceholders = [...placeholders];
+
+    // Ajouter les variables globales
+    document.querySelectorAll('[data-var-name]').forEach(varInput => {
+        const varName = varInput.value.trim();
+        if (varName) {
+            dynamicPlaceholders.push({
+                category: 'Variables',
+                code: '$' + varName,
+                description: 'Global variable'
+            });
+        }
+    });
+
+    // Ajouter les variables des imports
+    const importVars = await fetchImportVariables();
+    Object.entries(importVars).forEach(([varName, source]) => {
+        dynamicPlaceholders.push({
+            category: 'Import Variables',
+            code: '$' + varName,
+            description: `From ${source}`
+        });
+    });
+
+    // Ajouter les variables temporaires (champs du load courant)
+    let loadId = null;
+    const loadContainer = input.closest('[id^="load-"]');
+    if (loadContainer) {
+        const match = loadContainer.id.match(/load-(\d+)/);
+        if (match) {
+            loadId = parseInt(match[1]);
+            loadContainer.querySelectorAll('[data-field-name]').forEach(fieldInput => {
+                const fieldName = fieldInput.value.trim();
+                if (fieldName) {
+                    dynamicPlaceholders.push({
+                        category: 'Variables',
+                        code: '$' + fieldName,
+                        description: 'Temporary variable from current load'
+                    });
+                }
+            });
+        }
+    }
+
+    // Filter placeholders
+    const filtered = dynamicPlaceholders.filter(p =>
+        p.code.toLowerCase().includes(query.toLowerCase()) ||
+        p.description.toLowerCase().includes(query.toLowerCase())
+    );
+
+    if (filtered.length === 0) {
+        hideAutocomplete();
+        return;
+    }
+
+    // Group by category
+    const grouped = {};
+    filtered.forEach(p => {
+        if (!grouped[p.category]) grouped[p.category] = [];
+        grouped[p.category].push(p);
+    });
+
+    // Build autocomplete list
+    Object.entries(grouped).forEach(([category, items]) => {
+        const categoryEl = document.createElement('div');
+        categoryEl.className = 'autocomplete-category';
+        categoryEl.textContent = category;
+        container.appendChild(categoryEl);
+
+        items.forEach(item => {
+            const itemEl = document.createElement('div');
+            itemEl.className = 'autocomplete-item';
+            itemEl.innerHTML = `<code>{{ '{{' }} ${item.code} {{ '}}' }}</code><span class="description">${item.description}</span>`;
+            itemEl.addEventListener('click', () => insertAutocomplete(item.code));
+            container.appendChild(itemEl);
+        });
+    });
+
+    // Position autocomplete
+    const rect = input.getBoundingClientRect();
+    container.style.left = (rect.left + window.scrollX) + 'px';
+    container.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+    container.style.width = Math.max(400, rect.width) + 'px';
+    container.style.display = 'block';
+
+    autocompleteState.activeIndex = 0;
+    updateActiveItem(container.querySelectorAll('.autocomplete-item'));
+}
+
+function insertAutocomplete(code) {
+    const input = autocompleteState.activeInput;
+    if (!input) return;
+    
+    const value = input.value;
+    const cursorPos = input.selectionStart;
+    const beforeCursor = value.substring(0, cursorPos);
+    const afterCursor = value.substring(cursorPos);
+    
+    const lastOpenBraces = beforeCursor.lastIndexOf('{{ '{{' }}');
+    const beforePlaceholder = value.substring(0, lastOpenBraces);
+    
+    const newValue = beforePlaceholder + '{{ '{{' }} ' + code + ' {{ '}}' }}' + afterCursor;
+    input.value = newValue;
+    
+    const newCursorPos = beforePlaceholder.length + code.length + 6;
+    input.setSelectionRange(newCursorPos, newCursorPos);
+    input.focus();
+    
+    hideAutocomplete();
+    debounce(updatePreview, 100);
+}
+
+function hideAutocomplete() {
+    autocompleteState.container.style.display = 'none';
+    autocompleteState.activeInput = null;
+    autocompleteState.activeIndex = -1;
+}
+
+// Database autocomplete (tables and columns)
+function showDatabaseAutocomplete(input, query, type) {
+    const container = autocompleteState.container;
+    container.innerHTML = '';
+    
+    let items = [];
+    let databaseName = null;
+    
+    // Show available databases
+    if (type === 'database') {
+        // Use database aliases if available (e.g. from shared.db config)
+        if (databaseAliases && databaseAliases.length > 0) {
+            items = databaseAliases
+                .filter(name => 
+                    `%${name}%`.toLowerCase().includes(query.toLowerCase())
+                )
+                .map(name => `%${name}%`); // Only suggest with % format: %incare%, %logiciel%
+        } else if (isMultiDatabase) {
+            // Fallback to Doctrine connection names
+            const databases = Object.keys(tablesWithColumns);
+            items = databases
+                .filter(name => {
+                    const dbName = `%${name}%`;
+                    return dbName.toLowerCase().includes(query.toLowerCase()) || 
+                           name.toLowerCase().includes(query.toLowerCase());
+                })
+                .map(name => `%${name}%`);
+        }
+    }
+    // Determine which database to use based on input context
+    else if (type === 'table') {
+        // Get database from parent context
+        const tableAttr = input.dataset.loadTable || input.dataset.purgeTable || input.dataset.fieldLookupTable || input.dataset.purgeFieldLookupTable || input.dataset.pivotLookupTable;
+        if (tableAttr !== undefined) {
+            // For main load/purge table inputs
+            if (input.dataset.loadTable) {
+                const loadId = input.dataset.loadTable;
+                const dbInput = document.querySelector(`[data-load-db="${loadId}"]`);
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (input.dataset.purgeTable) {
+                const purgeId = input.dataset.purgeTable;
+                const dbInput = document.querySelector(`[data-purge-db="${purgeId}"]`);
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (input.dataset.fieldLookupTable) {
+                // For load field lookup
+                const fieldId = input.dataset.fieldLookupTable;
+                const dbInput = document.querySelector(`[data-field-lookup-db="${fieldId}"]`);
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (input.dataset.purgeFieldLookupTable) {
+                // For purge field lookup
+                const fieldId = input.dataset.purgeFieldLookupTable;
+                const dbInput = document.querySelector(`[data-purge-field-lookup-db="${fieldId}"]`);
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (input.dataset.pivotLookupTable) {
+                // For pivot custom lookup
+                const loadId = input.dataset.pivotLookupTable;
+                const dbInput = document.querySelector(`[data-pivot-lookup-db="${loadId}"]`);
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            }
+        }
+        
+        // Remove % from database name for lookup
+        if (databaseName) {
+            databaseName = databaseName.replace(/%/g, '');
+        }
+        
+        // Get tables from appropriate database
+        if (databaseName && databaseName !== '') {
+            // Load via AJAX if not default database
+            loadDatabaseSchemaIfNeeded(databaseName, () => {
+                const availableTables = tablesWithColumns[databaseName];
+                if (availableTables) {
+                    items = Object.keys(availableTables).filter(name => 
+                        name.toLowerCase().includes(query.toLowerCase())
+                    );
+                    displayAutocompleteItems(container, items, input);
+                }
+            });
+            return; // Exit early, will display after AJAX
+        } else if (isMultiDatabase) {
+            const dbKey = 'default';
+            const availableTables = tablesWithColumns[dbKey];
+            if (availableTables) {
+                items = Object.keys(availableTables).filter(name => 
+                    name.toLowerCase().includes(query.toLowerCase())
+                );
+            }
+        } else {
+            // Single database mode - ignore databaseName
+            items = tableNames.filter(name => 
+                name.toLowerCase().includes(query.toLowerCase())
+            );
+        }
+    } else if (type === 'column') {
+        // Get table reference
+        const tableRef = input.dataset.tableRef || input.dataset.tableRefLookup;
+        let tableName = null;
+        
+        if (tableRef) {
+            // Find the referenced table input and database
+            if (tableRef.startsWith('load-')) {
+                const loadId = tableRef.replace('load-', '');
+                const tableInput = document.querySelector(`[data-load-table="${loadId}"]`);
+                const dbInput = document.querySelector(`[data-load-db="${loadId}"]`);
+                tableName = tableInput ? tableInput.value : null;
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (tableRef.startsWith('purge-')) {
+                const purgeId = tableRef.replace('purge-', '');
+                const tableInput = document.querySelector(`[data-purge-table="${purgeId}"]`);
+                const dbInput = document.querySelector(`[data-purge-db="${purgeId}"]`);
+                tableName = tableInput ? tableInput.value : null;
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (tableRef.startsWith('lookup-table-')) {
+                const fieldId = tableRef.replace('lookup-table-', '');
+                const lookupTableInput = document.querySelector(`[data-field-lookup-table="${fieldId}"]`) ||
+                                        document.querySelector(`[data-purge-field-lookup-table="${fieldId}"]`);
+                const dbInput = document.querySelector(`[data-field-lookup-db="${fieldId}"]`) ||
+                               document.querySelector(`[data-purge-field-lookup-db="${fieldId}"]`);
+                tableName = lookupTableInput ? lookupTableInput.value : null;
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            } else if (tableRef.startsWith('pivot-table-')) {
+                const loadId = tableRef.replace('pivot-table-', '');
+                const lookupTableInput = document.querySelector(`[data-pivot-lookup-table="${loadId}"]`);
+                const dbInput = document.querySelector(`[data-pivot-lookup-db="${loadId}"]`);
+                tableName = lookupTableInput ? lookupTableInput.value : null;
+                databaseName = dbInput ? dbInput.value.trim() : null;
+            }
+        }
+        
+        // Remove % from database name for lookup
+        if (databaseName) {
+            databaseName = databaseName.replace(/%/g, '');
+        }
+        
+        // Get columns from appropriate database and table
+        if (tableName) {
+            if (databaseName && databaseName !== '') {
+                // Load via AJAX if not default database
+                loadDatabaseSchemaIfNeeded(databaseName, () => {
+                    const dbTables = tablesWithColumns[databaseName];
+                    if (dbTables && dbTables[tableName]) {
+                        items = dbTables[tableName].filter(col =>
+                            col.toLowerCase().includes(query.toLowerCase())
+                        );
+                        displayAutocompleteItems(container, items, input);
+                    }
+                });
+                return; // Exit early, will display after AJAX
+            } else if (isMultiDatabase) {
+                const dbKey = 'default';
+                const dbTables = tablesWithColumns[dbKey];
+                
+                if (dbTables && dbTables[tableName]) {
+                    items = dbTables[tableName].filter(col =>
+                        col.toLowerCase().includes(query.toLowerCase())
+                    );
+                }
+            } else {
+                // Single database mode - ignore databaseName
+                if (tablesWithColumns[tableName]) {
+                    items = tablesWithColumns[tableName].filter(col =>
+                        col.toLowerCase().includes(query.toLowerCase())
+                    );
+                }
+            }
+        }
+    }
+    
+    if (items.length === 0) {
+        hideAutocomplete();
+        return;
+    }
+    
+    displayAutocompleteItems(container, items, input, type);
+}
+
+// Helper function to display autocomplete items
+function displayAutocompleteItems(container, items, input, type = null) {
+    container.innerHTML = '';
+    
+    if (items.length === 0) {
+        hideAutocomplete();
+        return;
+    }
+    
+    // Infer type if not provided
+    if (!type) {
+        if (input.dataset.loadDb || input.dataset.purgeDb) {
+            type = 'database';
+        } else if (input.dataset.loadTable || input.dataset.purgeTable || input.dataset.fieldLookupTable) {
+            type = 'table';
+        } else {
+            type = 'column';
+        }
+    }
+    
+    // Build autocomplete list
+    const categoryEl = document.createElement('div');
+    categoryEl.className = 'autocomplete-category';
+    categoryEl.textContent = type === 'table' ? 'Tables' : type === 'column' ? 'Columns' : 'Databases';
+    container.appendChild(categoryEl);
+    
+    items.forEach(item => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'autocomplete-item';
+        itemEl.innerHTML = `<code>${item}</code>`;
+        itemEl.addEventListener('click', () => insertDatabaseAutocomplete(item));
+        container.appendChild(itemEl);
+    });
+    
+    // Position autocomplete
+    const rect = input.getBoundingClientRect();
+    container.style.left = (rect.left + window.scrollX) + 'px';
+    container.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+    container.style.width = Math.max(400, rect.width) + 'px';
+    container.style.display = 'block';
+    
+    autocompleteState.activeInput = input;
+    autocompleteState.activeIndex = 0;
+    updateActiveItem(container.querySelectorAll('.autocomplete-item'));
+}
+
+// Load database schema via AJAX if not already loaded
+const loadedDatabases = new Set(['default']); // Track which databases we've loaded
+
+function loadDatabaseSchemaIfNeeded(databaseName, callback) {
+    if (loadedDatabases.has(databaseName)) {
+        callback();
+        return;
+    }
+    
+    fetch('{{ path('prism_office_get_database_schema') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ database: databaseName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Error loading database schema:', data.error);
+            return;
+        }
+        
+        // Store the schema in tablesWithColumns
+        tablesWithColumns[databaseName] = data.tables;
+        loadedDatabases.add(databaseName);
+        
+        callback();
+    })
+    .catch(error => {
+        console.error('Error fetching database schema:', error);
+    });
+}
+
+function insertDatabaseAutocomplete(value) {
+    const input = autocompleteState.activeInput;
+    if (!input) return;
+    
+    input.value = value;
+    input.focus();
+    
+    // Déclencher la mise à jour du titre si c'est un input de database ou table
+    const loadDb = input.getAttribute('data-load-db');
+    const loadTable = input.getAttribute('data-load-table');
+    const purgeDb = input.getAttribute('data-purge-db');
+    const purgeTable = input.getAttribute('data-purge-table');
+    const importId = input.getAttribute('data-import-id');
+    const varName = input.getAttribute('data-var-name');
+    const fieldName = input.getAttribute('data-field-name');
+    
+    if (loadDb || loadTable) {
+        const id = loadDb || loadTable;
+        updateLoadTitle(id);
+    } else if (purgeDb || purgeTable) {
+        const id = purgeDb || purgeTable;
+        updatePurgeTitle(id);
+    } else if (importId) {
+        updateImportTitle(importId);
+    } else if (varName) {
+        updateVariableTitle(varName);
+    } else if (fieldName) {
+        updateFieldTitle(fieldName);
+    }
+
+    hideAutocomplete();
+    debounce(updatePreview, 100);
+}
+
+// Ajouter un import
+function addImport() {
+    const container = document.getElementById('importsContainer');
+    const id = importCounter++;
+    const isEditMode = {{ edit_mode|default(false) ? 'true' : 'false' }};
+    const collapsedClass = isEditMode ? 'collapsed' : '';
+
+    const html = `
+        <div class="item-card" id="import-${id}">
+            <div class="item-card-header" onclick="toggleInstruction('import-${id}')">
+                <span class="item-card-title">
+                    <button class="item-card-toggle" id="import-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('import-${id}')">${isEditMode ? '▶' : '▼'}</button>
+                    Import #${id + 1} <code id="import-${id}-path-info" style="color: #3498db; background: rgba(52, 152, 219, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
+                </span>
+                <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('import-${id}')">Remove</button>
+            </div>
+            <div class="item-card-body ${collapsedClass}" id="import-${id}-body">
+                <div class="form-group">
+                    <label>Scenario Name</label>
+                    <input type="text" 
+                           class="input-field import-autocomplete" 
+                           list="scenarios-datalist-${id}"
+                           placeholder="Type to search scenarios (e.g., base_users)" 
+                           data-import-id="${id}" 
+                           data-import-path
+                           oninput="updateImportTitle(${id}); invalidateImportCache();" 
+                           onchange="updateImportTitle(${id}); invalidateImportCache();">
+                    <datalist id="scenarios-datalist-${id}">
+                        ${existingScenarios.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    </datalist>
+                    <small>Import path from prism/ directory</small>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', html);
+    debounce(updatePreview, 100);
+}
+
+// Ajouter une variable
+function addVariable(data = null) {
+    const container = document.getElementById('variablesContainer');
+    const id = variableCounter++;
+    const isEditMode = {{ edit_mode|default(false) ? 'true' : 'false' }};
+    const collapsedClass = isEditMode ? 'collapsed' : '';
+    
+    const html = `
+        <div class="item-card" id="variable-${id}">
+            <div class="item-card-header" onclick="toggleInstruction('variable-${id}')">
+                <span class="item-card-title">
+                    <button class="item-card-toggle" id="variable-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('variable-${id}')">${isEditMode ? '▶' : '▼'}</button>
+                    Variable #${id + 1} <code id="variable-${id}-name-info" style="color: #9b59b6; background: rgba(155, 89, 182, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
+                </span>
+                <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('variable-${id}')">Remove</button>
+            </div>
+            <div class="item-card-body ${collapsedClass}" id="variable-${id}-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" class="input-field" placeholder="my_var" data-var-name="${id}" value="${data?.name || ''}" oninput="updateVariableTitle(${id})" onchange="updateVariableTitle(${id})">
+                        <small>Use without $ in declaration</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Value</label>
+                        <input type="text" class="input-field" placeholder='value or {{ '{{' }} scope {{ '}}' }}' data-var-value="${id}" value="${data?.value || ''}">
+                        <div class="placeholder-hint">Placeholders: {{ '{{' }} scope {{ '}}' }}, {{ '{{' }} uuid {{ '}}' }}, {{ '{{' }} hash('pass') {{ '}}' }}, {{ '{{' }} now {{ '}}' }}, {{ '{{' }} env('VAR') {{ '}}' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+    debounce(updatePreview, 100);
+}
+
+// Ajouter une instruction de chargement
+function addLoadInstruction() {
+    const container = document.getElementById('loadInstructionsContainer');
+    const id = loadCounter++;
+    const isEditMode = {{ edit_mode|default(false) ? 'true' : 'false' }};
+    const collapsedClass = isEditMode ? 'collapsed' : '';
+    
+    const html = `
+        <div class="item-card" id="load-${id}">
+            <div class="item-card-header" onclick="toggleInstruction('load-${id}')">
+                <span class="item-card-title">
+                    <button class="item-card-toggle" id="load-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('load-${id}')">${isEditMode ? '▶' : '▼'}</button>
+                    Load Instruction #${id + 1} <code id="load-${id}-table-info" style="color: #e67e22; background: rgba(230, 126, 34, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
+                </span>
+                <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('load-${id}')">Remove</button>
+            </div>
+            <div class="item-card-body ${collapsedClass}" id="load-${id}-body">
+            <div class="form-group">
+                <label>Database (Optional)</label>
+                <input type="text" class="input-field" placeholder="e.g. db_analytics, %db_logs%" data-load-db="${id}" data-autocomplete="database" oninput="updateLoadTitle(${id})" onchange="updateLoadTitle(${id})">
+                <small>Leave empty for default database. Examples: db_analytics, %db_logs%</small>
+            </div>
+            <div class="form-group">
+                <label>Table Name</label>
+                <input type="text" class="input-field" placeholder="users" data-load-table="${id}" data-autocomplete="table" oninput="updateLoadTitle(${id})" onchange="updateLoadTitle(${id})">
+            </div>
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="margin: 0;">Data (JSON format or use builder below)</label>
+                    <button type="button" class="btn" onclick="toggleJsonData('load-${id}')" style="padding: 4px 10px; font-size: 11px; background: rgba(97, 218, 251, 0.2); color: #61dafb;">📝 Use JSON</button>
+                </div>
+                <textarea class="input-field" data-load-data="${id}" id="load-${id}-json-data" style="display: none;" placeholder='{"username": "user_{{ '{{' }} scope {{ '}}' }}", "email": "user@test.com"}'></textarea>
+                <small id="load-${id}-json-hint" style="display: none;">You can also add fields using the builder below</small>
+            </div>
+            <div class="form-group" id="load-${id}-data-builder">
+                <div id="load-${id}-fields" class="nested-fields"></div>
+                <button class="btn btn-add" onclick="addField(${id}, 'data')">+ Add Field</button>
+            </div>
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <label style="margin: 0;">Types (Optional - JSON format or use builder below)</label>
+                    <button type="button" class="btn" onclick="toggleJsonTypes('load-${id}')" style="padding: 4px 10px; font-size: 11px; background: rgba(97, 218, 251, 0.2); color: #61dafb;">📝 Use JSON</button>
+                </div>
+                <textarea class="input-field" data-load-types="${id}" id="load-${id}-json-types" style="display: none;" placeholder='{"created_at": "datetime_immutable", "age": "int"}'></textarea>
+                <small id="load-${id}-json-types-hint" style="display: none;">Common types: datetime_immutable, datetime, int, float, bool, string</small>
+            </div>
+            <div class="form-group" id="load-${id}-types-builder">
+                <div id="load-${id}-types" class="nested-fields"></div>
+                <button class="btn btn-add" onclick="addType(${id})">+ Add Type</button>
+            </div>
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="margin: 0;">Pivot Custom (Optional - JSON format or use builder below)</label>
+                    <button type="button" class="btn" onclick="toggleJsonPivot('load-${id}')" style="padding: 4px 10px; font-size: 11px; background: rgba(97, 218, 251, 0.2); color: #61dafb;">📝 Use JSON</button>
+                </div>
+                <textarea id="load-${id}-json-pivot" class="input-field" data-load-pivot="${id}" placeholder='{"id": 42, "column": "user_id"}' style="display: none;"></textarea>
+                <small id="load-${id}-json-pivot-hint" style="display: none;">Track by custom column instead of id</small>
+                
+                <div id="load-${id}-pivot-builder" class="pivot-builder">
+                    <div class="field-type-toggle" style="margin-bottom: 10px;">
+                        <button type="button" onclick="setPivotType(${id}, 'simple')" class="active" id="load-${id}-pivot-simple-btn">Simple Value</button>
+                        <button type="button" onclick="setPivotType(${id}, 'lookup')" id="load-${id}-pivot-lookup-btn">Lookup (FK)</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Column Name</label>
+                        <input type="text" class="input-field" placeholder="user_id" data-pivot-column="${id}" data-autocomplete="column" data-table-ref="load-${id}">
+                        <small>The column name to track (e.g., user_id)</small>
+                    </div>
+                    
+                    <div id="load-${id}-pivot-simple" class="form-group">
+                        <label>ID Value</label>
+                        <input type="text" class="input-field" placeholder='42 or {{ '{{' }} uuid {{ '}}' }}' data-pivot-id-value="${id}">
+                    </div>
+                    
+                    <div id="load-${id}-pivot-lookup" class="form-group" style="display: none;">
+                        <label>Lookup Database (Optional)</label>
+                        <input type="text" class="input-field" placeholder="e.g. db_analytics, %db_logs%" data-pivot-lookup-db="${id}" data-autocomplete="database">
+                        <small>Leave empty for default database</small>
+                        <label>Lookup Table</label>
+                        <input type="text" class="input-field" placeholder="users" data-pivot-lookup-table="${id}" data-autocomplete="table">
+                        <label>Where Column</label>
+                        <input type="text" class="input-field" placeholder="username" data-pivot-lookup-where-col="${id}" data-autocomplete="column" data-table-ref-lookup="pivot-table-${id}">
+                        <label>Where Value</label>
+                        <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-pivot-lookup-where-val="${id}">
+                        <label>Return Column</label>
+                        <input type="text" class="input-field" placeholder="id" data-pivot-lookup-return="${id}" data-autocomplete="column" data-table-ref-lookup="pivot-table-${id}">
+                        <div class="helper-text">This will lookup the id from the specified table</div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+
+    debounce(updatePreview, 100);
+}
+
+// Ajouter un champ de données
+function addField(loadId, type, data = null, isEditMode = false) {
+    const container = document.getElementById(`load-${loadId}-fields`);
+    const fieldId = fieldCounter++;
+    
+    const columnName = data?.name || '';
+    const displayName = columnName ? `<code>${columnName}</code>` : '';
+    
+    const html = `
+        <div class="item-card field-item" id="field-${fieldId}" style="margin-bottom: 10px;">
+            <div class="item-card-header" onclick="toggleInstruction('field-${fieldId}')" style="cursor: pointer;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="item-card-toggle" id="field-${fieldId}-toggle" onclick="event.stopPropagation(); toggleInstruction('field-${fieldId}')">${isEditMode ? '▶' : '▼'}</button>
+                    <span class="item-card-title">Field <span id="field-${fieldId}-column-info">${displayName}</span></span>
+                </div>
+                <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('field-${fieldId}')">Remove</button>
+            </div>
+            <div class="item-card-body${isEditMode ? ' collapsed' : ''}" id="field-${fieldId}-body">
+                <div class="field-type-toggle">
+                    <button onclick="setFieldType(${fieldId}, 'simple')" class="active" id="field-${fieldId}-simple-btn">Simple Value</button>
+                    <button onclick="setFieldType(${fieldId}, 'lookup')" id="field-${fieldId}-lookup-btn">Lookup (FK)</button>
+                </div>
+                <div class="form-group">
+                    <label>Column Name</label>
+                    <input type="text" class="input-field" placeholder="username" data-field-name="${fieldId}" data-autocomplete="column" data-table-ref="load-${loadId}" value="${columnName}" oninput="updateFieldTitle(${fieldId})">
+                    <small>The column name to track (e.g., user_id)</small>
+                </div>
+                <div id="field-${fieldId}-simple" class="form-group">
+                    <label>Value</label>
+                    <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }} or {{ '{{' }} uuid {{ '}}' }}' data-field-value="${fieldId}" value="${data?.value || ''}">
+                    <div class="placeholder-hint">Examples: {{ '{{' }} scope {{ '}}' }}, {{ '{{' }} uuid {{ '}}' }}, {{ '{{' }} hash('pwd') {{ '}}' }}, {{ '{{' }} now {{ '}}' }}, {{ '{{' }} math(10*2) {{ '}}' }}</div>
+                </div>
+                <div id="field-${fieldId}-lookup" class="form-group" style="display: none;">
+                    <label>Lookup Database (Optional)</label>
+                    <input type="text" class="input-field" placeholder="e.g. db_analytics, %db_logs%" data-field-lookup-db="${fieldId}" data-autocomplete="database" value="${data?.lookupDb || ''}">
+                    <small>Leave empty for default database</small>
+                    <label>Lookup Table</label>
+                    <input type="text" class="input-field" placeholder="users" data-field-lookup-table="${fieldId}" data-autocomplete="table" value="${data?.lookupTable || ''}">
+                    <label>Where Column</label>
+                    <input type="text" class="input-field" placeholder="username" data-field-lookup-where-col="${fieldId}" data-autocomplete="column" data-table-ref-lookup="lookup-table-${fieldId}" value="${data?.lookupWhereCol || ''}">
+                    <label>Where Value</label>
+                    <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-field-lookup-where-val="${fieldId}" value="${data?.lookupWhereVal || ''}">
+                    <label>Return Column</label>
+                    <input type="text" class="input-field" placeholder="id" data-field-lookup-return="${fieldId}" data-autocomplete="column" data-table-ref-lookup="lookup-table-${fieldId}" value="${data?.lookupReturn || ''}">
+                    <div class="helper-text">This will lookup the id from users table where username matches</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', html);
+
+    // Ajouter l'autocomplétion des placeholders aux champs de valeur
+    setTimeout(() => {
+        const valueInput = document.querySelector(`[data-field-value="${fieldId}"]`);
+        const lookupWhereValInput = document.querySelector(`[data-field-lookup-where-val="${fieldId}"]`);
+
+        if (valueInput) {
+            updatePlaceholderDatalist(valueInput);
+            valueInput.addEventListener('focus', () => updatePlaceholderDatalist(valueInput));
+        }
+
+        if (lookupWhereValInput) {
+            updatePlaceholderDatalist(lookupWhereValInput);
+            lookupWhereValInput.addEventListener('focus', () => updatePlaceholderDatalist(lookupWhereValInput));
+        }
+    }, 10);
+
+    // Si c'est un lookup, basculer l'affichage
+    if (data?.isLookup) {
+        setFieldType(fieldId, 'lookup');
+    }
+    
+    debounce(updatePreview, 100);
+}
+
+function setFieldType(fieldId, type) {
+    const simpleDiv = document.getElementById(`field-${fieldId}-simple`);
+    const lookupDiv = document.getElementById(`field-${fieldId}-lookup`);
+    const simpleBtn = document.getElementById(`field-${fieldId}-simple-btn`);
+    const lookupBtn = document.getElementById(`field-${fieldId}-lookup-btn`);
+    
+    if (type === 'simple') {
+        simpleDiv.style.display = 'block';
+        lookupDiv.style.display = 'none';
+        simpleBtn.classList.add('active');
+        lookupBtn.classList.remove('active');
+    } else {
+        simpleDiv.style.display = 'none';
+        lookupDiv.style.display = 'block';
+        simpleBtn.classList.remove('active');
+        lookupBtn.classList.add('active');
+    }
+    debounce(updatePreview, 100);
+}
+
+// Ajouter un type
+function addType(loadId) {
+    const container = document.getElementById(`load-${loadId}-types`);
+    const typeId = fieldCounter++;
+    
+    const html = `
+        <div class="item-card field-item" id="type-${typeId}" style="margin-bottom: 10px;">
+            <div class="item-card-header">
+                <span class="item-card-title">Type Conversion</span>
+                <button class="item-card-remove" onclick="removeItem('type-${typeId}')">Remove</button>
+            </div>
+            <div class="form-group">
+                <label>Column Name</label>
+                <input type="text" class="input-field" placeholder="created_at" data-type-column="${typeId}" data-autocomplete="column" data-table-ref="load-${loadId}">
+                <small>The column to convert (e.g., created_at, age, price)</small>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select class="input-field" data-type-value="${typeId}">
+                    <option value="">Select type...</option>
+                    <optgroup label="String Types">
+                        <option value="string">string - String</option>
+                        <option value="text">text - Long Text</option>
+                        <option value="guid">guid - UUID/GUID</option>
+                    </optgroup>
+                    <optgroup label="Numeric Types">
+                        <option value="int">int - Integer</option>
+                        <option value="smallint">smallint - Small Integer</option>
+                        <option value="bigint">bigint - Big Integer</option>
+                        <option value="float">float - Float</option>
+                        <option value="decimal">decimal - Decimal (precise)</option>
+                    </optgroup>
+                    <optgroup label="Boolean">
+                        <option value="bool">bool - Boolean</option>
+                    </optgroup>
+                    <optgroup label="DateTime Types">
+                        <option value="datetime">datetime - DateTime</option>
+                        <option value="datetime_immutable">datetime_immutable - DateTimeImmutable</option>
+                        <option value="datetimetz">datetimetz - DateTime with Timezone</option>
+                        <option value="datetimetz_immutable">datetimetz_immutable - DateTimeImmutable with Timezone</option>
+                        <option value="date">date - Date only</option>
+                        <option value="date_immutable">date_immutable - Date only (immutable)</option>
+                        <option value="time">time - Time only</option>
+                        <option value="time_immutable">time_immutable - Time only (immutable)</option>
+                    </optgroup>
+                    <optgroup label="Complex Types">
+                        <option value="json">json - JSON</option>
+                        <option value="array">array - Serialized Array</option>
+                        <option value="simple_array">simple_array - CSV Array</option>
+                    </optgroup>
+                    <optgroup label="Binary Types">
+                        <option value="binary">binary - Binary Data</option>
+                        <option value="blob">blob - Large Binary Object</option>
+                    </optgroup>
+                </select>
+                <small>Select the PHP type for conversion</small>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+    debounce(updatePreview, 100);
+}
+
+// Toggle JSON data visibility
+function toggleJsonData(loadId) {
+    const textarea = document.getElementById(`${loadId}-json-data`);
+    const hint = document.getElementById(`${loadId}-json-hint`);
+    const builder = document.getElementById(`${loadId}-data-builder`);
+    const btn = event.target;
+    
+    if (textarea.style.display === 'none') {
+        textarea.style.display = 'block';
+        if (hint) hint.style.display = 'block';
+        builder.style.display = 'none';
+        btn.textContent = '🎨 Use Builder';
+    } else {
+        textarea.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        builder.style.display = 'block';
+        btn.textContent = '📝 Use JSON';
+    }
+}
+
+// Toggle JSON pivot visibility
+function toggleJsonPivot(loadId) {
+    const textarea = document.getElementById(`${loadId}-json-pivot`);
+    const hint = document.getElementById(`${loadId}-json-pivot-hint`);
+    const builder = document.getElementById(`${loadId}-pivot-builder`);
+    const btn = event.target;
+    
+    if (textarea.style.display === 'none') {
+        textarea.style.display = 'block';
+        if (hint) hint.style.display = 'block';
+        builder.style.display = 'none';
+        btn.textContent = '🎨 Use Builder';
+    } else {
+        textarea.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        builder.style.display = 'block';
+        btn.textContent = '📝 Use JSON';
+    }
+}
+
+// Toggle JSON where visibility (for purge)
+function toggleJsonWhere(purgeId) {
+    const textarea = document.getElementById(`${purgeId}-json-where`);
+    const hint = document.getElementById(`${purgeId}-json-where-hint`);
+    const builder = document.getElementById(`${purgeId}-where-builder`);
+    const btn = event.target;
+    
+    if (textarea.style.display === 'none') {
+        textarea.style.display = 'block';
+        if (hint) hint.style.display = 'block';
+        builder.style.display = 'none';
+        btn.textContent = '🎨 Use Builder';
+    } else {
+        textarea.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        builder.style.display = 'block';
+        btn.textContent = '📝 Use JSON';
+    }
+}
+
+// Toggle JSON types visibility (for types)
+function toggleJsonTypes(loadId) {
+    const textarea = document.getElementById(`${loadId}-json-types`);
+    const hint = document.getElementById(`${loadId}-json-types-hint`);
+    const builder = document.getElementById(`${loadId}-types-builder`);
+    const btn = event.target;
+    
+    if (textarea.style.display === 'none') {
+        textarea.style.display = 'block';
+        if (hint) hint.style.display = 'block';
+        builder.style.display = 'none';
+        btn.textContent = '🎨 Use Builder';
+    } else {
+        textarea.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        builder.style.display = 'block';
+        btn.textContent = '📝 Use JSON';
+    }
+}
+
+// Set pivot type (simple or lookup)
+function setPivotType(loadId, type) {
+    const simpleDiv = document.getElementById(`load-${loadId}-pivot-simple`);
+    const lookupDiv = document.getElementById(`load-${loadId}-pivot-lookup`);
+    const simpleBtn = document.getElementById(`load-${loadId}-pivot-simple-btn`);
+    const lookupBtn = document.getElementById(`load-${loadId}-pivot-lookup-btn`);
+    
+    if (type === 'simple') {
+        simpleDiv.style.display = 'block';
+        lookupDiv.style.display = 'none';
+        simpleBtn.classList.add('active');
+        lookupBtn.classList.remove('active');
+    } else {
+        simpleDiv.style.display = 'none';
+        lookupDiv.style.display = 'block';
+        simpleBtn.classList.remove('active');
+        lookupBtn.classList.add('active');
+    }
+    debounce(updatePreview, 100);
+}
+
+// Ajouter une instruction de purge
+function addPurgeInstruction() {
+    const container = document.getElementById('purgeInstructionsContainer');
+    const id = purgeCounter++;
+    const isEditMode = {{ edit_mode|default(false) ? 'true' : 'false' }};
+    const collapsedClass = isEditMode ? 'collapsed' : '';
+    
+    const html = `
+        <div class="item-card" id="purge-${id}">
+            <div class="item-card-header" onclick="toggleInstruction('purge-${id}')">
+                <span class="item-card-title">
+                    <button class="item-card-toggle" id="purge-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('purge-${id}')">${isEditMode ? '▶' : '▼'}</button>
+                    Purge Instruction #${id + 1} <code id="purge-${id}-table-info" style="color: #e67e22; background: rgba(230, 126, 34, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
+                </span>
+                <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('purge-${id}')">Remove</button>
+            </div>
+            <div class="item-card-body ${collapsedClass}" id="purge-${id}-body">
+            <div class="form-group">
+                <label>Database (Optional)</label>
+                <input type="text" class="input-field" placeholder="e.g. db_analytics, %db_logs%" data-purge-db="${id}" data-autocomplete="database" oninput="updatePurgeTitle(${id})" onchange="updatePurgeTitle(${id})">
+                <small>Leave empty for default database</small>
+            </div>
+            <div class="form-group">
+                <label>Table Name</label>
+                <input type="text" class="input-field" placeholder="users" data-purge-table="${id}" data-autocomplete="table" oninput="updatePurgeTitle(${id})" onchange="updatePurgeTitle(${id})">
+            </div>
+            <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="margin: 0;">Where Conditions (JSON format or use builder below)</label>
+                    <button type="button" class="btn" onclick="toggleJsonWhere('purge-${id}')" style="padding: 4px 10px; font-size: 11px; background: rgba(97, 218, 251, 0.2); color: #61dafb;">📝 Use JSON</button>
+                </div>
+                <textarea id="purge-${id}-json-where" class="input-field" data-purge-where="${id}" placeholder='{"username": "user_{{ '{{' }} scope {{ '}}' }}"}' style="display: none;"></textarea>
+                <small id="purge-${id}-json-where-hint" style="display: none;">Conditions to match for deletion</small>
+            </div>
+            <div class="form-group" id="purge-${id}-where-builder">
+                <div id="purge-${id}-fields" class="nested-fields"></div>
+                <button class="btn btn-add" onclick="addPurgeField(${id})">+ Add Where Condition</button>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+    debounce(updatePreview, 100);
+}
+
+// Ajouter un champ where pour purge
+function addPurgeField(purgeId, data = null) {
+    const container = document.getElementById(`purge-${purgeId}-fields`);
+    const fieldId = fieldCounter++;
+    
+    const html = `
+        <div class="item-card purge-field-item" id="purge-field-${fieldId}" style="margin-bottom: 10px;">
+            <div class="item-card-header">
+                <span class="item-card-title">Where Field</span>
+                <button class="item-card-remove" onclick="removeItem('purge-field-${fieldId}')">Remove</button>
+            </div>
+            <div class="field-type-toggle">
+                <button onclick="setPurgeFieldType(${fieldId}, 'simple')" class="active" id="purge-field-${fieldId}-simple-btn">Simple Value</button>
+                <button onclick="setPurgeFieldType(${fieldId}, 'lookup')" id="purge-field-${fieldId}-lookup-btn">Lookup (FK)</button>
+            </div>
+            <div class="form-group">
+                <label>Column Name</label>
+                <input type="text" class="input-field" placeholder="username" data-purge-field-name="${fieldId}" data-purge-id="${purgeId}" data-autocomplete="column" data-table-ref="purge-${purgeId}" value="${data?.name || ''}">
+                <small>The column name to track (e.g., user_id)</small>
+            </div>
+            <div id="purge-field-${fieldId}-simple" class="form-group">
+                <label>Value</label>
+                <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-purge-field-value="${fieldId}" value="${data?.value || ''}">
+            </div>
+            <div id="purge-field-${fieldId}-lookup" class="form-group" style="display: none;">
+                <label>Lookup Database (Optional)</label>
+                <input type="text" class="input-field" placeholder="e.g. db_analytics, %db_logs%" data-purge-field-lookup-db="${fieldId}" data-autocomplete="database" value="${data?.lookupDb || ''}">
+                <small>Leave empty for default database</small>
+                <label>Lookup Table</label>
+                <input type="text" class="input-field" placeholder="users" data-purge-field-lookup-table="${fieldId}" data-autocomplete="table" value="${data?.lookupTable || ''}">
+                <label>Where Column</label>
+                <input type="text" class="input-field" placeholder="username" data-purge-field-lookup-where-col="${fieldId}" data-autocomplete="column" data-table-ref-lookup="purge-field-lookup-table-${fieldId}" value="${data?.lookupWhereCol || ''}">
+                <label>Where Value</label>
+                <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-purge-field-lookup-where-val="${fieldId}" value="${data?.lookupWhereVal || ''}">
+                <label>Return Column</label>
+                <input type="text" class="input-field" placeholder="id" data-purge-field-lookup-return="${fieldId}" data-autocomplete="column" data-table-ref-lookup="purge-field-lookup-table-${fieldId}" value="${data?.lookupReturn || ''}">
+                <div class="helper-text">This will lookup the value to use in the purge where condition</div>
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', html);
+
+    // Ajouter l'autocomplétion des placeholders aux champs purge
+    setTimeout(() => {
+        const purgeValueInput = document.querySelector(`[data-purge-field-value="${fieldId}"]`);
+        const purgeLookupWhereValInput = document.querySelector(`[data-purge-field-lookup-where-val="${fieldId}"]`);
+
+        if (purgeValueInput) {
+            updatePlaceholderDatalist(purgeValueInput);
+            purgeValueInput.addEventListener('focus', () => updatePlaceholderDatalist(purgeValueInput));
+        }
+
+        if (purgeLookupWhereValInput) {
+            updatePlaceholderDatalist(purgeLookupWhereValInput);
+            purgeLookupWhereValInput.addEventListener('focus', () => updatePlaceholderDatalist(purgeLookupWhereValInput));
+        }
+    }, 10);
+
+    // Si c'est un lookup, basculer l'affichage
+    if (data?.isLookup) {
+        setPurgeFieldType(fieldId, 'lookup');
+    }
+
+    debounce(updatePreview, 100);
+}
+
+// Toggle collapse/expand d'une instruction
+function toggleInstruction(instructionId) {
+    const body = document.getElementById(`${instructionId}-body`);
+    const toggle = document.getElementById(`${instructionId}-toggle`);
+    
+    if (body && toggle) {
+        if (body.classList.contains('collapsed')) {
+            body.classList.remove('collapsed');
+            toggle.textContent = '▼';
+        } else {
+            body.classList.add('collapsed');
+            toggle.textContent = '▶';
+        }
+    }
+}
+
+// Mettre à jour le titre d'une instruction load avec dbname.tablename
+function updateLoadTitle(id) {
+    const dbInput = document.querySelector(`[data-load-db="${id}"]`);
+    const tableInput = document.querySelector(`[data-load-table="${id}"]`);
+    const titleElement = document.getElementById(`load-${id}-table-info`);
+    
+    if (titleElement && tableInput) {
+        const db = dbInput?.value.trim() || '';
+        const table = tableInput.value.trim();
+        
+        if (table) {
+            titleElement.textContent = db ? `${db}.${table}` : table;
+            titleElement.style.display = 'inline';
+        } else {
+            titleElement.textContent = '';
+            titleElement.style.display = 'none';
+        }
+    }
+}
+
+// Mettre à jour le titre d'une instruction purge avec dbname.tablename
+function updatePurgeTitle(id) {
+    const dbInput = document.querySelector(`[data-purge-db="${id}"]`);
+    const tableInput = document.querySelector(`[data-purge-table="${id}"]`);
+    const titleElement = document.getElementById(`purge-${id}-table-info`);
+    
+    if (titleElement && tableInput) {
+        const db = dbInput?.value.trim() || '';
+        const table = tableInput.value.trim();
+        
+        if (table) {
+            titleElement.textContent = db ? `${db}.${table}` : table;
+            titleElement.style.display = 'inline';
+        } else {
+            titleElement.textContent = '';
+            titleElement.style.display = 'none';
+        }
+    }
+}
+
+// Mettre à jour le titre d'un field avec le nom de la colonne
+function updateFieldTitle(fieldId) {
+    const columnInput = document.querySelector(`[data-field-name="${fieldId}"]`);
+    const titleElement = document.getElementById(`field-${fieldId}-column-info`);
+    
+    if (titleElement && columnInput) {
+        const columnName = columnInput.value.trim();
+        
+        if (columnName) {
+            titleElement.innerHTML = `<code>${columnName}</code>`;
+        } else {
+            titleElement.innerHTML = '';
+        }
+    }
+    debounce(updatePreview, 100);
+}
+
+// Mettre à jour le titre d'un import avec le nom du scénario
+function updateImportTitle(id) {
+    const textInput = document.querySelector(`[data-import-id="${id}"]`);
+    const titleElement = document.getElementById(`import-${id}-path-info`);
+
+    if (titleElement) {
+        const importPath = textInput?.value.trim() || '';
+
+        if (importPath) {
+            titleElement.textContent = importPath;
+            titleElement.style.display = 'inline';
+        } else {
+            titleElement.textContent = '';
+            titleElement.style.display = 'none';
+        }
+    }
+}
+
+// Mettre à jour le titre d'une variable avec son nom
+function updateVariableTitle(id) {
+    const nameInput = document.querySelector(`[data-var-name="${id}"]`);
+    const titleElement = document.getElementById(`variable-${id}-name-info`);
+    
+    if (titleElement && nameInput) {
+        const varName = nameInput.value.trim();
+        
+        if (varName) {
+            titleElement.textContent = varName;
+            titleElement.style.display = 'inline';
+        } else {
+            titleElement.textContent = '';
+            titleElement.style.display = 'none';
+        }
+    }
+}
+
+
+
+function setPurgeFieldType(fieldId, type) {
+    const simpleDiv = document.getElementById(`purge-field-${fieldId}-simple`);
+    const lookupDiv = document.getElementById(`purge-field-${fieldId}-lookup`);
+    const simpleBtn = document.getElementById(`purge-field-${fieldId}-simple-btn`);
+    const lookupBtn = document.getElementById(`purge-field-${fieldId}-lookup-btn`);
+    
+    if (type === 'simple') {
+        simpleDiv.style.display = 'block';
+        lookupDiv.style.display = 'none';
+        simpleBtn.classList.add('active');
+        lookupBtn.classList.remove('active');
+    } else {
+        simpleDiv.style.display = 'none';
+        lookupDiv.style.display = 'block';
+        simpleBtn.classList.remove('active');
+        lookupBtn.classList.add('active');
+    }
+    debounce(updatePreview, 100);
+}
+
+// Ajouter purge_pivot: true
+function addPurgePivot() {
+    const container = document.getElementById('purgeInstructionsContainer');
+    const id = purgeCounter++;
+    
+    const html = `
+        <div class="item-card" id="purge-${id}" style="background: rgba(230, 126, 34, 0.1); border-color: #e67e22;">
+            <div class="item-card-header">
+                <span class="item-card-title" style="color: #e67e22;">🔄 Execute Automatic Purge Here</span>
+                <button class="item-card-remove" onclick="removeItem('purge-${id}')">Remove</button>
+            </div>
+            <input type="hidden" data-purge-pivot="${id}" value="true">
+            <div class="helper-text" style="border-color: #e67e22;">
+                This will trigger the automatic purge (via pivot tracker) at this position in the sequence.
+                Useful to control when automatic cleanup happens relative to custom purge instructions.
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', html);
+    debounce(updatePreview, 100);
+}
+
+// Supprimer un élément
+function removeItem(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.remove();
+        debounce(updatePreview, 100);
+    }
+}
+
+// Toggle placeholders reference
+function toggleReference() {
+    const ref = document.getElementById('placeholdersReference');
+    if (ref.style.display === 'none') {
+        ref.style.display = 'block';
+    } else {
+        ref.style.display = 'none';
+    }
+}
+
+// Toggle placeholders section (floating)
+function togglePlaceholders() {
+    const section = document.getElementById('placeholdersSection');
+    const icon = document.getElementById('placeholdersBtnIcon');
+    
+    if (section.style.display === 'none' || section.style.display === '') {
+        section.style.display = 'block';
+        icon.textContent = '✖️';
+    } else {
+        section.style.display = 'none';
+        icon.textContent = '📚';
+    }
+}
+
+// Toggle preview section
+function togglePreview() {
+    const section = document.getElementById('previewSection');
+    const icon = document.getElementById('previewBtnIcon');
+    
+    if (section.style.display === 'none' || section.style.display === '') {
+        section.style.display = 'block';
+        icon.textContent = '✖️';
+        updatePreview();
+    } else {
+        section.style.display = 'none';
+        icon.textContent = '📝';
+    }
+}
+
+// Mettre à jour la prévisualisation YAML
+function updatePreview() {
+    try {
+        const data = collectFormData();
+        const yaml = generateYAML(data);
+        document.getElementById('yamlPreview').textContent = yaml;
+    } catch (e) {
+        document.getElementById('yamlPreview').textContent = 'Error: ' + e.message;
+    }
+}
+
+// Collecter les données du formulaire
+function collectFormData() {
+    const data = {
+        name: document.getElementById('scenarioName').value.trim(),
+        imports: [],
+        variables: {},
+        load: [],
+        purge: []
+    };
+
+    // Imports
+    document.querySelectorAll('[data-import-id]').forEach(input => {
+        const value = input.value.trim();
+        if (value) {
+            data.imports.push(value);
+        }
+    });
+
+    // Variables
+    document.querySelectorAll('[data-var-name]').forEach(input => {
+        const id = input.getAttribute('data-var-name');
+        const name = input.value.trim();
+        const value = document.querySelector(`[data-var-value="${id}"]`).value;
+        if (name) {
+            // Gérer null et chaîne vide explicitement
+            if (value === 'null') {
+                data.variables[name] = null;
+            } else if (value === '') {
+                data.variables[name] = '';
+            } else {
+                data.variables[name] = value;
+            }
+        }
+    });
+    
+    // Load instructions
+    document.querySelectorAll('[data-load-table]').forEach(input => {
+        const id = input.getAttribute('data-load-table');
+        const table = input.value.trim();
+        if (!table) return;
+        
+        const dbInput = document.querySelector(`[data-load-db="${id}"]`);
+        const database = dbInput ? dbInput.value.trim() : '';
+        const dataTextarea = document.querySelector(`[data-load-data="${id}"]`);
+        const dataBuilder = document.getElementById(`load-${id}-data-builder`);
+        const typesTextarea = document.querySelector(`[data-load-types="${id}"]`);
+        const pivotTextarea = document.querySelector(`[data-load-pivot="${id}"]`);
+        
+        let loadData = {};
+        
+        // Check builder first, fallback to JSON textarea
+        if (dataBuilder && dataBuilder.style.display !== 'none') {
+            // Use builder
+            const fieldsContainer = document.getElementById(`load-${id}-fields`);
+            if (fieldsContainer) {
+                fieldsContainer.querySelectorAll('[data-field-name]').forEach(fieldInput => {
+                    const fieldId = fieldInput.getAttribute('data-field-name');
+                    const fieldName = fieldInput.value.trim();
+                    if (!fieldName) return;
+                    
+                    const simpleDiv = document.getElementById(`field-${fieldId}-simple`);
+                    if (simpleDiv && simpleDiv.style.display !== 'none') {
+                        // Simple value
+                        const value = document.querySelector(`[data-field-value="${fieldId}"]`).value;
+                        // Ne pas trim pour préserver les chaînes vides et null
+                        if (value === 'null') {
+                            loadData[fieldName] = null;
+                        } else if (value === '') {
+                            loadData[fieldName] = '';
+                        } else {
+                            loadData[fieldName] = value;
+                        }
+                    } else {
+                        // Lookup
+                        const table = document.querySelector(`[data-field-lookup-table="${fieldId}"]`).value.trim();
+                        const lookupDb = document.querySelector(`[data-field-lookup-db="${fieldId}"]`)?.value.trim() || '';
+                        const whereCol = document.querySelector(`[data-field-lookup-where-col="${fieldId}"]`).value.trim();
+                        const whereVal = document.querySelector(`[data-field-lookup-where-val="${fieldId}"]`).value.trim();
+                        const returnCol = document.querySelector(`[data-field-lookup-return="${fieldId}"]`).value.trim();
+                        
+                        if (table && whereCol && returnCol) {
+                            const whereObj = {};
+                            whereObj[whereCol] = whereVal;
+                            loadData[fieldName] = {
+                                table: table,
+                                where: whereObj,
+                                return: returnCol
+                            };
+                            if (lookupDb) {
+                                loadData[fieldName].db = lookupDb;
+                            }
+                        }
+                    }
+                });
+            }
+        } else if (dataTextarea.value.trim()) {
+            // Use JSON textarea
+            try {
+                loadData = JSON.parse(dataTextarea.value);
+            } catch (e) {
+                // Ignore invalid JSON
+            }
+        }
+        
+        const instruction = { table, data: loadData };
+        if (database) {
+            instruction.database = database;
+        }
+        
+        // Types - check builder first, fallback to JSON textarea
+        const typesBuilder = document.getElementById(`load-${id}-types-builder`);
+        let typesFromBuilder = {};
+        
+        if (typesBuilder && typesBuilder.style.display !== 'none') {
+            // Build types from builder inputs
+            const typesContainer = document.getElementById(`load-${id}-types`);
+            if (typesContainer) {
+                typesContainer.querySelectorAll('[data-type-column]').forEach(typeInput => {
+                    const typeId = typeInput.getAttribute('data-type-column');
+                    const columnName = typeInput.value.trim();
+                    const typeValue = document.querySelector(`[data-type-value="${typeId}"]`)?.value.trim();
+                    
+                    if (columnName && typeValue) {
+                        typesFromBuilder[columnName] = typeValue;
+                    }
+                });
+            }
+            
+            if (Object.keys(typesFromBuilder).length > 0) {
+                instruction.types = typesFromBuilder;
+            }
+        } else if (typesTextarea && typesTextarea.value.trim()) {
+            // Use JSON textarea
+            try {
+                instruction.types = JSON.parse(typesTextarea.value);
+            } catch (e) {}
+        }
+        
+        // Pivot - check builder first, fallback to JSON textarea
+        const pivotBuilder = document.getElementById(`load-${id}-pivot-builder`);
+        let pivotFromBuilder = null;
+        
+        if (pivotBuilder && pivotBuilder.style.display !== 'none') {
+            // Build pivot from builder inputs
+            const columnInput = document.querySelector(`[data-pivot-column="${id}"]`);
+            const column = columnInput?.value.trim();
+            
+            if (column) {
+                const simpleDiv = document.getElementById(`load-${id}-pivot-simple`);
+                
+                if (simpleDiv && simpleDiv.style.display !== 'none') {
+                    // Simple value
+                    const idValue = document.querySelector(`[data-pivot-id-value="${id}"]`)?.value.trim();
+                    if (idValue) {
+                        pivotFromBuilder = {
+                            id: idValue,
+                            column: column
+                        };
+                    }
+                } else {
+                    // Lookup
+                    const table = document.querySelector(`[data-pivot-lookup-table="${id}"]`)?.value.trim();
+                    const lookupDb = document.querySelector(`[data-pivot-lookup-db="${id}"]`)?.value.trim() || '';
+                    const whereCol = document.querySelector(`[data-pivot-lookup-where-col="${id}"]`)?.value.trim();
+                    const whereVal = document.querySelector(`[data-pivot-lookup-where-val="${id}"]`)?.value.trim();
+                    const returnCol = document.querySelector(`[data-pivot-lookup-return="${id}"]`)?.value.trim();
+                    
+                    if (table && whereCol && returnCol) {
+                        const whereObj = {};
+                        whereObj[whereCol] = whereVal;
+                        const lookupObj = {
+                            table: table,
+                            where: whereObj,
+                            return: returnCol
+                        };
+                        if (lookupDb) {
+                            lookupObj.db = lookupDb;
+                        }
+                        pivotFromBuilder = {
+                            id: lookupObj,
+                            column: column
+                        };
+                    }
+                }
+            }
+        }
+        
+        // Use builder pivot or fallback to JSON textarea
+        if (pivotFromBuilder) {
+            instruction.pivot = pivotFromBuilder;
+        } else if (pivotTextarea.value.trim()) {
+            try {
+                instruction.pivot = JSON.parse(pivotTextarea.value);
+            } catch (e) {}
+        }
+        
+        data.load.push(instruction);
+    });
+    
+    // Purge instructions
+    document.querySelectorAll('[data-purge-table]').forEach(input => {
+        const id = input.getAttribute('data-purge-table');
+        const table = input.value.trim();
+        if (!table) return;
+        
+        const dbInput = document.querySelector(`[data-purge-db="${id}"]`);
+        const database = dbInput ? dbInput.value.trim() : '';
+        const whereTextarea = document.querySelector(`[data-purge-where="${id}"]`);
+        const whereBuilder = document.getElementById(`purge-${id}-where-builder`);
+        let where = {};
+        
+        // Check builder first, fallback to JSON textarea
+        if (whereBuilder && whereBuilder.style.display !== 'none') {
+            // Use builder
+            const fieldsContainer = document.getElementById(`purge-${id}-fields`);
+            if (fieldsContainer) {
+                fieldsContainer.querySelectorAll('[data-purge-field-name]').forEach(fieldInput => {
+                    const fieldName = fieldInput.value.trim();
+                    const fieldId = fieldInput.getAttribute('data-purge-field-name');
+                    if (!fieldName) return;
+                    
+                    const simpleDiv = document.getElementById(`purge-field-${fieldId}-simple`);
+                    if (simpleDiv && simpleDiv.style.display !== 'none') {
+                        // Simple value
+                        const value = document.querySelector(`[data-purge-field-value="${fieldId}"]`).value;
+                        // Ne pas trim pour préserver les chaînes vides et null
+                        if (value === 'null') {
+                            where[fieldName] = null;
+                        } else if (value === '') {
+                            where[fieldName] = '';
+                        } else {
+                            where[fieldName] = value;
+                        }
+                    } else {
+                        // Lookup
+                        const table = document.querySelector(`[data-purge-field-lookup-table="${fieldId}"]`).value.trim();
+                        const lookupDb = document.querySelector(`[data-purge-field-lookup-db="${fieldId}"]`)?.value.trim() || '';
+                        const whereCol = document.querySelector(`[data-purge-field-lookup-where-col="${fieldId}"]`).value.trim();
+                        const whereVal = document.querySelector(`[data-purge-field-lookup-where-val="${fieldId}"]`).value.trim();
+                        const returnCol = document.querySelector(`[data-purge-field-lookup-return="${fieldId}"]`).value.trim();
+                        
+                        if (table && whereCol && returnCol) {
+                            const whereObj = {};
+                            whereObj[whereCol] = whereVal;
+                            where[fieldName] = {
+                                table: table,
+                                where: whereObj,
+                                return: returnCol
+                            };
+                            if (lookupDb) {
+                                where[fieldName].db = lookupDb;
+                            }
+                        }
+                    }
+                });
+            }
+        } else if (whereTextarea.value.trim()) {
+            // Use JSON textarea
+            try {
+                where = JSON.parse(whereTextarea.value);
+            } catch (e) {}
+        }
+        
+        const purgeInstr = { table, where };
+        if (database) {
+            purgeInstr.database = database;
+        }
+        data.purge.push(purgeInstr);
+    });
+    
+    // Purge pivot
+    document.querySelectorAll('[data-purge-pivot]').forEach(input => {
+        data.purge.push({ purge_pivot: true });
+    });
+    
+    return data;
+}
+
+// Générer le YAML à partir des données
+function generateYAML(data) {
+    let yaml = `# Scenario: ${data.name}\n#\n# Created by PrismOffice\n#\n# Usage:\n#   php bin/console app:prism:load ${data.name} --scope=YOUR_SCOPE\n#   php bin/console app:prism:purge ${data.name} --scope=YOUR_SCOPE\n\n`;
+    
+    // Helper function pour formater les valeurs YAML
+    const formatYamlValue = (value) => {
+        if (value === null) {
+            return 'null';
+        }
+        if (value === '') {
+            return '""';
+        }
+        if (typeof value === 'string') {
+            return `"${value}"`;
+        }
+        return value;
+    };
+    
+    // Imports
+    if (data.imports.length > 0) {
+        yaml += 'import:\n';
+        data.imports.forEach(imp => {
+            yaml += `  - ${imp}\n`;
+        });
+        yaml += '\n';
+    }
+    
+    // Variables
+    if (Object.keys(data.variables).length > 0) {
+        yaml += 'vars:\n';
+        Object.entries(data.variables).forEach(([key, value]) => {
+            yaml += `  ${key}: ${formatYamlValue(value)}\n`;
+        });
+        yaml += '\n';
+    }
+    
+    // Load
+    if (data.load.length > 0) {
+        yaml += 'load:\n';
+        data.load.forEach(load => {
+            yaml += `  - table: ${load.table}\n`;
+            if (load.database) {
+                yaml += `    db: "${load.database}"\n`;
+            }
+            yaml += '    data:\n';
+            Object.entries(load.data).forEach(([key, value]) => {
+                if (typeof value === 'object' && value !== null && value.table) {
+                    // Lookup
+                    yaml += `      ${key}:\n`;
+                    if (value.db) {
+                        yaml += `        db: "${value.db}"\n`;
+                    }
+                    yaml += `        table: ${value.table}\n`;
+                    yaml += `        where:\n`;
+                    Object.entries(value.where).forEach(([wk, wv]) => {
+                        yaml += `          ${wk}: ${formatYamlValue(wv)}\n`;
+                    });
+                    yaml += `        return: ${value.return}\n`;
+                } else {
+                    yaml += `      ${key}: ${formatYamlValue(value)}\n`;
+                }
+            });
+            
+            if (load.types && Object.keys(load.types).length > 0) {
+                yaml += '    types:\n';
+                Object.entries(load.types).forEach(([key, value]) => {
+                    yaml += `      ${key}: ${value}\n`;
+                });
+            }
+            
+            if (load.pivot) {
+                yaml += '    pivot:\n';
+                Object.entries(load.pivot).forEach(([key, value]) => {
+                    if (typeof value === 'object' && value !== null && value.table) {
+                        // Lookup
+                        yaml += `      ${key}:\n`;
+                        if (value.db) {
+                            yaml += `        db: "${value.db}"\n`;
+                        }
+                        yaml += `        table: ${value.table}\n`;
+                        yaml += `        where:\n`;
+                        Object.entries(value.where).forEach(([wk, wv]) => {
+                            yaml += `          ${wk}: "${wv}"\n`;
+                        });
+                        yaml += `        return: ${value.return}\n`;
+                    } else {
+                        yaml += `      ${key}: ${value}\n`;
+                    }
+                });
+            }
+            yaml += '\n';
+        });
+        yaml += '\n';
+    }
+    
+    // Purge
+    if (data.purge.length > 0) {
+        yaml += 'purge:\n';
+        data.purge.forEach(purge => {
+            if (purge.purge_pivot) {
+                yaml += '  - purge_pivot: true\n';
+            } else {
+                yaml += `  - table: ${purge.table}\n`;
+                if (purge.database) {
+                    yaml += `    db: "${purge.database}"\n`;
+                }
+                yaml += '    where:\n';
+                Object.entries(purge.where).forEach(([key, value]) => {
+                    if (typeof value === 'object' && value !== null && value.table) {
+                        // Lookup
+                        yaml += `      ${key}:\n`;
+                        if (value.db) {
+                            yaml += `        db: ${value.db}\n`;
+                        }
+                        yaml += `        table: ${value.table}\n`;
+                        yaml += `        where:\n`;
+                        Object.entries(value.where).forEach(([wk, wv]) => {
+                            yaml += `          ${wk}: ${formatYamlValue(wv)}\n`;
+                        });
+                        yaml += `        return: ${value.return}\n`;
+                    } else {
+                        yaml += `      ${key}: ${formatYamlValue(value)}\n`;
+                    }
+                });
+            }
+            yaml += '\n';
+        });
+    }
+    
+    return yaml;
+}
+
+// Sauvegarder le scénario
+async function saveScenario() {
+    try {
+        const data = collectFormData();
+        
+        if (!data.name) {
+            alert('Please enter a scenario name');
+            return;
+        }
+        
+        if (data.load.length === 0) {
+            alert('Please add at least one load instruction');
+            return;
+        }
+        
+        // Si on est dans un sous-dossier ET en mode création, préfixer le nom avec le chemin
+        {% if not edit_mode %}
+        if (targetFolder && targetFolder !== '') {
+            data.name = targetFolder + '/' + data.name;
+        }
+        {% endif %}
+        
+        const response = await fetch('{{ save_path }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Scenario {% if edit_mode %}updated{% else %}created{% endif %} successfully!');
+            window.location.href = '{{ list_path }}';
+        } else {
+            alert('Error: ' + result.error);
+        }
+    } catch (e) {
+        alert('Error saving scenario: ' + e.message);
+    }
+}
+
+// Annuler et retourner à la liste
+function cancelAndGoBack() {
+    window.location.href = '{{ list_path }}';
+}
+
+// Load existing scenario data (edit mode)
+function loadScenarioData(providedData = null) {
+    let data;
+    
+    if (providedData) {
+        console.log(providedData);
+        // Données fournies par applyYamlToBuilder
+        data = providedData;
+    } else {
+        {% if scenario_data %}
+        console.log('Edit mode detected, loading data...');
+        console.log({{ scenario_data|json_encode|raw }});
+        data = {
+            name: {{ scenario_data.getName()|json_encode|raw }},
+            imports: {{ scenario_data.getImports()|json_encode|raw }},
+            variables: {{ scenario_data.getVariables()|json_encode|raw }},
+            load: [
+                {% for instruction in scenario_data.getLoadInstructions() %}
+                {
+                    table: {{ instruction.getTable()|json_encode|raw }},
+                    data: {{ instruction.getData()|json_encode|raw }},
+                    types: {{ instruction.getTypes()|json_encode|raw }},
+                    pivot: {{ instruction.getPivot()|json_encode|raw }},
+                    database: {{ instruction.getDatabase()|json_encode|raw }}
+                }{{ loop.last ? '' : ',' }}
+                {% endfor %}
+            ],
+            purge: [
+                {% for instruction in scenario_data.getPurgeInstructions() %}
+                {
+                    table: {{ instruction.getTable()|json_encode|raw }},
+                    where: {{ instruction.getWhere()|json_encode|raw }},
+                    purge_pivot: {{ instruction.getPurgePivot() ? 'true' : 'false' }},
+                    database: {{ instruction.getDatabase()|json_encode|raw }}
+                }{{ loop.last ? '' : ',' }}
+                {% endfor %}
+            ]
+        };
+        {% else %}
+        console.log('No scenario data to load (create mode)');
+        return;
+        {% endif %}
+    }
+    
+    console.log('Loading scenario data:', data);
+
+    // Load imports - synchrone
+    data.imports.forEach((importName) => {
+        addImport();
+        // Attendre que le DOM soit mis à jour
+        const containers = document.querySelectorAll('#importsContainer .item-card');
+        const lastContainer = containers[containers.length - 1];
+        if (lastContainer) {
+            console.log('Setting import:', importName);
+            const textInput = lastContainer.querySelector('input[data-import-id]');
+
+            if (textInput) {
+                textInput.value = importName;
+            }
+
+            // Get import ID and update title
+            const importId = textInput?.getAttribute('data-import-id');
+            if (importId) {
+                updateImportTitle(importId);
+            }
+        }
+    });
+
+    console.log(data.variables);
+    // Load variables
+    Object.entries(data.variables).forEach(([key, value]) => {
+        // Convertir null en string "null" pour le formulaire
+        let displayValue = value;
+        if (value === null) {
+            displayValue = 'null';
+        } else if (value === '') {
+            displayValue = '';
+        }
+        console.log('Adding variable:', key, '=', displayValue);
+        addVariable({ name: key, value: displayValue });
+        
+        // Get variable ID and update title
+        const containers = document.querySelectorAll('#variablesContainer .item-card');
+        const lastContainer = containers[containers.length - 1];
+        if (lastContainer) {
+            const nameInput = lastContainer.querySelector('[data-var-name]');
+            if (nameInput) {
+                const varId = nameInput.getAttribute('data-var-name');
+                updateVariableTitle(varId);
+            }
+        }
+    });
+    
+    // Load instructions - synchrone
+    data.load.forEach((loadInstr) => {
+        addLoadInstruction();
+        
+        // Récupérer le dernier container ajouté
+        const containers = document.querySelectorAll('#loadInstructionsContainer .item-card');
+        const lastContainer = containers[containers.length - 1];
+        if (!lastContainer) return;
+        
+        // Récupérer l'ID réel créé par addLoadInstruction
+        const tableInput = lastContainer.querySelector('input[data-load-table]');
+        if (!tableInput) return;
+        
+        const loadId = tableInput.getAttribute('data-load-table');
+        tableInput.value = loadInstr.table;
+        
+        // Set database if present
+        if (loadInstr.database) {
+            const dbInput = lastContainer.querySelector(`[data-load-db="${loadId}"]`);
+            if (dbInput) {
+                dbInput.value = loadInstr.database;
+            }
+        }
+        
+        // Update title for edit mode
+        updateLoadTitle(loadId);
+        
+        // Add fields directement avec les données
+        Object.entries(loadInstr.data).forEach(([fieldName, fieldValue]) => {
+            console.log('Loading field:', fieldName, 'with value:', fieldValue, 'type:', typeof fieldValue);
+            if (typeof fieldValue === 'object' && fieldValue !== null && fieldValue.table) {
+                // C'est un lookup
+                const whereEntries = Object.entries(fieldValue.where);
+                const [whereCol, whereVal] = whereEntries[0] || ['', ''];
+                
+                addField(loadId, 'data', {
+                    name: fieldName,
+                    isLookup: true,
+                    lookupTable: fieldValue.table,
+                    lookupDb: fieldValue.database || fieldValue.db || '',
+                    lookupWhereCol: whereCol,
+                    lookupWhereVal: whereVal,
+                    lookupReturn: fieldValue.return
+                }, true);
+            } else {
+                // Valeur simple - convertir null en string "null" pour le formulaire
+                let displayValue = fieldValue;
+                if (fieldValue === null) {
+                    displayValue = 'null';
+                } else if (fieldValue === '') {
+                    displayValue = '';
+                }
+                addField(loadId, 'data', {
+                    name: fieldName,
+                    value: displayValue,
+                    isLookup: false
+                }, true);
+            }
+        });
+        
+        // Add types - use builder
+        if (loadInstr.types && Object.keys(loadInstr.types).length > 0) {
+            Object.entries(loadInstr.types).forEach(([columnName, typeValue]) => {
+                addType(loadId);
+                const typesContainer = document.getElementById(`load-${loadId}-types`);
+                if (typesContainer) {
+                    const typeInputs = typesContainer.querySelectorAll('[data-type-column]');
+                    const lastTypeInput = typeInputs[typeInputs.length - 1];
+                    if (lastTypeInput) {
+                        const typeId = lastTypeInput.getAttribute('data-type-column');
+                        lastTypeInput.value = columnName;
+                        const typeSelect = document.querySelector(`[data-type-value="${typeId}"]`);
+                        if (typeSelect) {
+                            typeSelect.value = typeValue;
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Set pivot - load into builder by default
+        if (loadInstr.pivot && Object.keys(loadInstr.pivot).length > 0) {
+            const pivot = loadInstr.pivot;
+            
+            // Set column
+            const columnInput = lastContainer.querySelector(`[data-pivot-column="${loadId}"]`);
+            if (columnInput && pivot.column) {
+                columnInput.value = pivot.column;
+            }
+            
+            // Check if id is a lookup or simple value
+            if (typeof pivot.id === 'object' && pivot.id !== null && pivot.id.table) {
+                // It's a lookup
+                setPivotType(loadId, 'lookup');
+                
+                const tableInput = lastContainer.querySelector(`[data-pivot-lookup-table="${loadId}"]`);
+                const dbInput = lastContainer.querySelector(`[data-pivot-lookup-db="${loadId}"]`);
+                const whereColInput = lastContainer.querySelector(`[data-pivot-lookup-where-col="${loadId}"]`);
+                const whereValInput = lastContainer.querySelector(`[data-pivot-lookup-where-val="${loadId}"]`);
+                const returnInput = lastContainer.querySelector(`[data-pivot-lookup-return="${loadId}"]`);
+                
+                if (tableInput) tableInput.value = pivot.id.table || '';
+                if (dbInput) dbInput.value = pivot.id.database || pivot.id.db || '';
+                if (returnInput) returnInput.value = pivot.id.return || '';
+                
+                // Get first where condition
+                const whereEntries = Object.entries(pivot.id.where || {});
+                if (whereEntries.length > 0) {
+                    const [whereCol, whereVal] = whereEntries[0];
+                    if (whereColInput) whereColInput.value = whereCol;
+                    if (whereValInput) whereValInput.value = whereVal;
+                }
+            } else {
+                // Simple value
+                setPivotType(loadId, 'simple');
+                const idValueInput = lastContainer.querySelector(`[data-pivot-id-value="${loadId}"]`);
+                if (idValueInput) {
+                    idValueInput.value = pivot.id || '';
+                }
+            }
+        }
+    });
+    
+    // Load purge instructions - synchrone
+    data.purge.forEach((purgeInstr) => {
+        if (purgeInstr.purge_pivot === true && !purgeInstr.table) {
+            addPurgePivot();
+        } else {
+            addPurgeInstruction();
+            
+            const containers = document.querySelectorAll('#purgeInstructionsContainer .item-card');
+            const lastContainer = containers[containers.length - 1];
+            if (!lastContainer) return;
+            
+            // Récupérer l'ID réel créé par addPurgeInstruction
+            const tableInput = lastContainer.querySelector('input[data-purge-table]');
+            if (!tableInput) return;
+            
+            const purgeId = tableInput.getAttribute('data-purge-table');
+            tableInput.value = purgeInstr.table;
+            
+            // Set database if present
+            if (purgeInstr.database) {
+                const dbInput = lastContainer.querySelector(`[data-purge-db="${purgeId}"]`);
+                if (dbInput) {
+                    dbInput.value = purgeInstr.database;
+                }
+            }
+            
+            // Update title for edit mode
+            updatePurgeTitle(purgeId);
+            
+            // Add where conditions directement avec les données
+            Object.entries(purgeInstr.where || {}).forEach(([fieldName, fieldValue]) => {
+                if (typeof fieldValue === 'object' && fieldValue !== null && fieldValue.table) {
+                    // C'est un lookup
+                    const whereEntries = Object.entries(fieldValue.where);
+                    const [whereCol, whereVal] = whereEntries[0] || ['', ''];
+                    
+                    addPurgeField(purgeId, {
+                        name: fieldName,
+                        isLookup: true,
+                        lookupTable: fieldValue.table,
+                        lookupDb: fieldValue.database || fieldValue.db || '',
+                        lookupWhereCol: whereCol,
+                        lookupWhereVal: whereVal,
+                        lookupReturn: fieldValue.return
+                    });
+                } else {
+                    // Valeur simple - convertir null en string "null" pour le formulaire
+                    let displayValue = fieldValue;
+                    if (fieldValue === null) {
+                        displayValue = 'null';
+                    } else if (fieldValue === '') {
+                        displayValue = '';
+                    }
+                    addPurgeField(purgeId, {
+                        name: fieldName,
+                        value: displayValue,
+                        isLookup: false
+                    });
+                }
+            });
+        }
+    });
+    
+    // Update preview after loading
+    setTimeout(updatePreview, 500);
+}
+
+// Parser YAML simple (sans dépendance externe)
+function parseYAML(yamlText) {
+    const lines = yamlText.split('\n').filter(line => {
+        const trimmed = line.trim();
+        return trimmed && !trimmed.startsWith('#');
+    });
+    
+    const result = {
+        name: '',
+        imports: [],
+        variables: {},
+        load: [],
+        purge: []
+    };
+    
+    let currentSection = null;
+    let currentLoadItem = null;
+    let currentPurgeItem = null;
+    let currentDataSection = null;
+    let indent = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        const currentIndent = line.length - line.trimLeft().length;
+        
+        // Sections principales
+        if (trimmed === 'import:') {
+            currentSection = 'import';
+            continue;
+        } else if (trimmed === 'vars:') {
+            currentSection = 'vars';
+            continue;
+        } else if (trimmed === 'load:') {
+            currentSection = 'load';
+            continue;
+        } else if (trimmed === 'purge:') {
+            currentSection = 'purge';
+            continue;
+        }
+        
+        // Parse imports
+        if (currentSection === 'import' && trimmed.startsWith('- ')) {
+            result.imports.push(trimmed.substring(2).trim());
+        }
+        
+        // Parse vars
+        if (currentSection === 'vars' && trimmed.includes(':')) {
+            const [key, ...valueParts] = trimmed.split(':');
+            let value = valueParts.join(':').trim();
+            value = value.replace(/^["']|["']$/g, '');
+            result.variables[key.trim()] = value;
+        }
+        
+        // Parse load
+        if (currentSection === 'load') {
+            if (trimmed.startsWith('- table:')) {
+                // New load item starting with table on same line
+                if (currentLoadItem) {
+                    result.load.push(currentLoadItem);
+                }
+                currentLoadItem = {
+                    table: trimmed.substring(8).trim(),
+                    data: {},
+                    types: {},
+                    pivot: {}
+                };
+                currentDataSection = null;
+            } else if (trimmed === '-') {
+                // New load item starting
+                if (currentLoadItem) {
+                    result.load.push(currentLoadItem);
+                }
+                currentLoadItem = {
+                    table: '',
+                    data: {},
+                    types: {},
+                    pivot: {}
+                };
+                currentDataSection = null;
+            } else if (currentLoadItem) {
+                if (trimmed.startsWith('table:') && !currentLoadItem.table) {
+                    currentLoadItem.table = trimmed.split(':')[1].trim();
+                } else if (trimmed === 'data:') {
+                    currentDataSection = 'data';
+                } else if (trimmed === 'types:') {
+                    currentDataSection = 'types';
+                } else if (trimmed === 'pivot:') {
+                    currentDataSection = 'pivot';
+                } else if (currentDataSection === 'data' && trimmed.includes(':')) {
+                    const [key, ...valueParts] = trimmed.split(':');
+                    const fieldName = key.trim();
+                    let value = valueParts.join(':').trim();
+                    
+                    // Check if it's a lookup (no value on same line, next lines are indented more)
+                    if (!value || value === '') {
+                        // It's likely a lookup - check next line
+                        if (i + 1 < lines.length) {
+                            const nextLine = lines[i + 1];
+                            const nextIndent = nextLine.length - nextLine.trimLeft().length;
+                            const nextTrimmed = nextLine.trim();
+                            
+                            if (nextIndent > currentIndent && (nextTrimmed.startsWith('table:') || nextTrimmed.startsWith('database:'))) {
+                                // It's a lookup
+                                const lookup = { where: {} };
+                                i++;
+                                
+                                // Parse lookup properties
+                                while (i < lines.length) {
+                                    const lookupLine = lines[i];
+                                    const lookupIndent = lookupLine.length - lookupLine.trimLeft().length;
+                                    const lookupTrimmed = lookupLine.trim();
+                                    
+                                    // Si on revient à l'indentation initiale ou moins, on arrête
+                                    if (lookupIndent <= currentIndent) {
+                                        i--;
+                                        break;
+                                    }
+                                    
+                                    if (lookupTrimmed.startsWith('table:')) {
+                                        lookup.table = lookupTrimmed.split(':')[1].trim();
+                                    } else if (lookupTrimmed.startsWith('database:')) {
+                                        lookup.database = lookupTrimmed.split(':')[1].trim().replace(/^["']|["']$/g, '');
+                                    } else if (lookupTrimmed === 'where:') {
+                                        // Parse where conditions
+                                        i++;
+                                        while (i < lines.length) {
+                                            const whereLine = lines[i];
+                                            const whereIndent = whereLine.length - whereLine.trimLeft().length;
+                                            const whereTrimmed = whereLine.trim();
+                                            
+                                            if (whereIndent <= lookupIndent) {
+                                                i--;
+                                                break;
+                                            }
+                                            
+                                            if (whereTrimmed.includes(':')) {
+                                                const [wk, ...wv] = whereTrimmed.split(':');
+                                                lookup.where[wk.trim()] = wv.join(':').trim().replace(/^["']|["']$/g, '');
+                                            }
+                                            i++;
+                                        }
+                                    } else if (lookupTrimmed.startsWith('return:')) {
+                                        lookup.return = lookupTrimmed.split(':')[1].trim();
+                                    }
+                                    i++;
+                                }
+                                currentLoadItem.data[fieldName] = lookup;
+                            } else {
+                                // Empty value
+                                currentLoadItem.data[fieldName] = '';
+                            }
+                        } else {
+                            currentLoadItem.data[fieldName] = '';
+                        }
+                    } else {
+                        value = value.replace(/^["']|["']$/g, '');
+                        currentLoadItem.data[fieldName] = value;
+                    }
+                } else if (currentDataSection === 'types' && trimmed.includes(':')) {
+                    const [key, value] = trimmed.split(':');
+                    currentLoadItem.types[key.trim()] = value.trim();
+                } else if (currentDataSection === 'pivot' && trimmed.includes(':')) {
+                    const [key, ...valueParts] = trimmed.split(':');
+                    const fieldName = key.trim();
+                    let value = valueParts.join(':').trim();
+                    
+                    // Special case for 'column' field
+                    if (fieldName === 'column') {
+                        currentLoadItem.pivot[fieldName] = value;
+                    } else if (!value || value === '') {
+                        // Check if it's a lookup
+                        if (i + 1 < lines.length) {
+                            const nextLine = lines[i + 1];
+                            const nextIndent = nextLine.length - nextLine.trimLeft().length;
+                            const nextTrimmed = nextLine.trim();
+                            
+                            if (nextIndent > currentIndent && (nextTrimmed.startsWith('table:') || nextTrimmed.startsWith('database:'))) {
+                                // It's a lookup
+                                const lookup = { where: {} };
+                                i++;
+                                
+                                while (i < lines.length) {
+                                    const lookupLine = lines[i];
+                                    const lookupIndent = lookupLine.length - lookupLine.trimLeft().length;
+                                    const lookupTrimmed = lookupLine.trim();
+                                    
+                                    if (lookupIndent <= currentIndent) {
+                                        i--;
+                                        break;
+                                    }
+                                    
+                                    if (lookupTrimmed.startsWith('table:')) {
+                                        lookup.table = lookupTrimmed.split(':')[1].trim();
+                                    } else if (lookupTrimmed.startsWith('database:')) {
+                                        lookup.database = lookupTrimmed.split(':')[1].trim().replace(/^["']|["']$/g, '');
+                                    } else if (lookupTrimmed === 'where:') {
+                                        i++;
+                                        while (i < lines.length) {
+                                            const whereLine = lines[i];
+                                            const whereIndent = whereLine.length - whereLine.trimLeft().length;
+                                            const whereTrimmed = whereLine.trim();
+                                            
+                                            if (whereIndent <= lookupIndent) {
+                                                i--;
+                                                break;
+                                            }
+                                            
+                                            if (whereTrimmed.includes(':')) {
+                                                const [wk, ...wv] = whereTrimmed.split(':');
+                                                lookup.where[wk.trim()] = wv.join(':').trim().replace(/^["']|["']$/g, '');
+                                            }
+                                            i++;
+                                        }
+                                    } else if (lookupTrimmed.startsWith('return:')) {
+                                        lookup.return = lookupTrimmed.split(':')[1].trim();
+                                    }
+                                    i++;
+                                }
+                                currentLoadItem.pivot[fieldName] = lookup;
+                            } else {
+                                currentLoadItem.pivot[fieldName] = '';
+                            }
+                        } else {
+                            currentLoadItem.pivot[fieldName] = '';
+                        }
+                    } else {
+                        value = value.replace(/^["']|["']$/g, '');
+                        currentLoadItem.pivot[fieldName] = value;
+                    }
+                }
+            }
+        }
+        
+        // Parse purge
+        if (currentSection === 'purge') {
+            if (trimmed.startsWith('- table:')) {
+                if (currentPurgeItem) {
+                    result.purge.push(currentPurgeItem);
+                }
+                currentPurgeItem = {
+                    table: trimmed.split(':')[1].trim(),
+                    where: {}
+                };
+                currentDataSection = null;
+            } else if (trimmed === '- purge_pivot: true') {
+                result.purge.push({ purge_pivot: true });
+            } else if (currentPurgeItem) {
+                if (trimmed === 'where:') {
+                    currentDataSection = 'where';
+                } else if (currentDataSection === 'where' && trimmed.includes(':')) {
+                    const [key, ...valueParts] = trimmed.split(':');
+                    const fieldName = key.trim();
+                    let value = valueParts.join(':').trim();
+                    
+                    // Check if it's a lookup
+                    if (!value && i + 1 < lines.length && lines[i + 1].trim() === 'table:') {
+                        const lookup = { where: {} };
+                        i++;
+                        while (i < lines.length) {
+                            const nextLine = lines[i].trim();
+                            const nextIndent = lines[i].length - lines[i].trimLeft().length;
+                            if (nextIndent <= currentIndent + 2) break;
+                            
+                            if (nextLine.startsWith('table:')) {
+                                lookup.table = nextLine.split(':')[1].trim();
+                            } else if (nextLine === 'where:') {
+                                i++;
+                                while (i < lines.length) {
+                                    const whereLine = lines[i].trim();
+                                    const whereIndent = lines[i].length - lines[i].trimLeft().length;
+                                    if (whereIndent <= nextIndent + 2) {
+                                        i--;
+                                        break;
+                                    }
+                                    if (whereLine.includes(':')) {
+                                        const [wk, ...wv] = whereLine.split(':');
+                                        lookup.where[wk.trim()] = wv.join(':').trim().replace(/^["']|["']$/g, '');
+                                    }
+                                    i++;
+                                }
+                            } else if (nextLine.startsWith('return:')) {
+                                lookup.return = nextLine.split(':')[1].trim();
+                            }
+                            i++;
+                        }
+                        currentPurgeItem.where[fieldName] = lookup;
+                    } else {
+                        value = value.replace(/^["']|["']$/g, '');
+                        currentPurgeItem.where[fieldName] = value;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add last items
+    if (currentLoadItem) result.load.push(currentLoadItem);
+    if (currentPurgeItem) result.purge.push(currentPurgeItem);
+    
+    return result;
+}
+
+// Appliquer le YAML au builder
+function applyYamlToBuilder() {
+    const yamlText = document.getElementById('yamlPreview').value;
+    
+    if (!yamlText || yamlText.includes('Click "Builder')) {
+        alert('⚠️ Please generate or edit YAML first');
+        return;
+    }
+    
+    if (!confirm('⚠️ This will replace all current builder content with the YAML data.\n\nAre you sure you want to continue?')) {
+        return;
+    }
+    
+    try {
+        const data = parseYAML(yamlText);
+        
+        // Extract scenario name from first line comment or use current
+        const firstLine = yamlText.split('\n')[0];
+        if (firstLine.includes('# Scenario:')) {
+            data.name = firstLine.replace('# Scenario:', '').trim();
+        }
+        
+        // Clear all existing items
+        document.getElementById('importsContainer').innerHTML = '';
+        document.getElementById('variablesContainer').innerHTML = '';
+        document.getElementById('loadInstructionsContainer').innerHTML = '';
+        document.getElementById('purgeInstructionsContainer').innerHTML = '';
+        
+        // Reset counters
+        importCounter = 0;
+        variableCounter = 0;
+        loadCounter = 0;
+        purgeCounter = 0;
+        fieldCounter = 0;
+        
+        // Set scenario name (if not in edit mode)
+        const scenarioNameInput = document.getElementById('scenarioName');
+        if (scenarioNameInput && !scenarioNameInput.hasAttribute('readonly') && data.name) {
+            scenarioNameInput.value = data.name;
+        }
+        
+        // Utiliser loadScenarioData avec les données parsées
+        loadScenarioData(data);
+        
+        alert('✅ YAML successfully applied to builder!');
+        
+        // Refresh preview to confirm
+        setTimeout(() => updatePreview(), 1000);
+        
+    } catch (e) {
+        console.error('YAML parse error:', e);
+        alert('❌ Error parsing YAML: ' + e.message + '\n\nPlease check your YAML syntax.');
+    }
+}
+
+// Initialize auto-update on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== PAGE LOADED ===');
+    
+    setupAutoUpdate();
+    setupAutocomplete();
+    loadScenarioData();
+});
+</script>

@@ -1,0 +1,147 @@
+{% extends '@PrismOffice/layout.html.twig' %}
+
+{% block title %}Loaded Scenarios - Prism Office{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-header">
+            <h2>🚀 Loaded Scenarios</h2>
+        </div>
+
+        {% if loadedScenarios|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Scenario Name</th>
+                        <th>Scope</th>
+                        <th>Resources Count</th>
+                        <th style="width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for loaded in loadedScenarios %}
+                        <tr>
+                            <td><code>{{ loaded.scenarioName }}</code></td>
+                            <td><span class="badge badge-scope">{{ loaded.scope }}</span></td>
+                            <td>
+                                <span class="badge badge-count">{{ loaded.resourceCount }}</span>
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <a 
+                                        href="{{ path('prism_office_resources', {name: loaded.scenarioName, scope: loaded.scope}) }}" 
+                                        class="btn btn-primary btn-small"
+                                    >
+                                        👁️ View
+                                    </a>
+                                    
+                                    <form method="POST" action="{{ path('prism_office_purge') }}" style="display:inline;">
+                                        <input type="hidden" name="scenario_name" value="{{ loaded.scenarioName }}">
+                                        <input type="hidden" name="scope" value="{{ loaded.scope }}" data-keep-scope>
+                                        <input type="hidden" name="redirect_to" value="prism_office_loaded">
+                                        <button 
+                                            type="submit" 
+                                            class="btn btn-danger btn-small"
+                                            onclick="return confirm('Purge {{ loaded.scenarioName }} ({{ loaded.scope }})?');"
+                                        >
+                                            🗑️ Purge
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div style="text-align: center; padding: 3rem;">
+                <p style="font-size: 3rem; margin-bottom: 1rem;">📭</p>
+                <p class="text-muted">No loaded scenarios found.</p>
+                <p class="text-muted">Load a scenario from the <a href="{{ path('prism_office_list') }}" style="color: #4a9eff;">Scenarios page</a>.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card" style="background: #2a2a3a;">
+        <h3 style="color: #4a9eff; margin-bottom: 1rem;">📊 Statistics</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div style="background: #1a1a2a; padding: 1rem; border-radius: 4px;">
+                <div style="font-size: 2rem; color: #4a9eff; font-weight: bold;">
+                    {{ loadedScenarios|length }}
+                </div>
+                <div class="text-muted">Loaded Scenarios</div>
+            </div>
+            <div style="background: #1a1a2a; padding: 1rem; border-radius: 4px;">
+                <div style="font-size: 2rem; color: #ff9800; font-weight: bold;">
+                    {% set total = 0 %}
+                    {% for loaded in loadedScenarios %}
+                        {% set total = total + loaded.resourceCount %}
+                    {% endfor %}
+                    {{ total }}
+                </div>
+                <div class="text-muted">Total Resources</div>
+            </div>
+            <div style="background: #1a1a2a; padding: 1rem; border-radius: 4px;">
+                <div style="font-size: 2rem; color: #4caf50; font-weight: bold;">
+                    {% set scopes = [] %}
+                    {% for loaded in loadedScenarios %}
+                        {% if loaded.scope not in scopes %}
+                            {% set scopes = scopes|merge([loaded.scope]) %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ scopes|length }}
+                </div>
+                <div class="text-muted">Active Scopes</div>
+            </div>
+        </div>
+    </div>
+
+    {% if loadedScenarios|length > 0 %}
+    <div class="card" style="background: #2a1a1a;">
+        <h3 style="color: #e74c3c; margin-bottom: 1rem;">⚠️ Purge by Scope</h3>
+        <p class="text-muted" style="margin-bottom: 1rem;">Delete all resources for a specific scope (all scenarios)</p>
+        
+        {% set scopes = [] %}
+        {% set scopeData = {} %}
+        {% for loaded in loadedScenarios %}
+            {% if loaded.scope not in scopes %}
+                {% set scopes = scopes|merge([loaded.scope]) %}
+                {% set scopeData = scopeData|merge({(loaded.scope): {'count': 0, 'scenarios': []}}) %}
+            {% endif %}
+            {% set scopeData = scopeData|merge({
+                (loaded.scope): {
+                    'count': scopeData[loaded.scope].count + loaded.resourceCount,
+                    'scenarios': scopeData[loaded.scope].scenarios|merge([loaded.scenarioName])
+                }
+            }) %}
+        {% endfor %}
+
+        <div style="display: grid; gap: 1rem;">
+            {% for scope in scopes %}
+                <div style="background: #1a1a2a; padding: 1rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                            <span class="badge badge-scope" style="font-size: 1.1em;">{{ scope }}</span>
+                            <span class="badge badge-count">{{ scopeData[scope].count }} resources</span>
+                        </div>
+                        <div class="text-muted" style="font-size: 0.9em;">
+                            Scenarios: {{ scopeData[scope].scenarios|join(', ') }}
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ path('prism_office_purge_scope') }}" style="display:inline;">
+                        <input type="hidden" name="scope" value="{{ scope }}" data-keep-scope>
+                        <input type="hidden" name="redirect_to" value="prism_office_loaded">
+                        <button 
+                            type="submit" 
+                            class="btn btn-danger"
+                            onclick="return confirm('⚠️ Delete ALL {{ scopeData[scope].count }} resources for scope \'{{ scope }}\'?\n\nThis will purge all scenarios in this scope.');"
+                        >
+                            🗑️ Purge Scope
+                        </button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}

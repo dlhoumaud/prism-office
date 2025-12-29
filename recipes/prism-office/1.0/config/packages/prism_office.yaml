@@ -1,0 +1,3 @@
+prism_office:
+    enabled: '%kernel.debug%'
+    route_prefix: '/prism'

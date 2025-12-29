@@ -1,0 +1,85 @@
+{% extends '@PrismOffice/layout.html.twig' %}
+
+{% block title %}Resources - {{ scenarioName }} ({{ scope }}) - Prism Office{% endblock %}
+
+{% block content %}
+    <nav style="margin-bottom: 2rem;">
+        <a href="{{ path('prism_office_loaded') }}" style="color: #4a9eff; text-decoration: none;">
+            ← Back to Loaded Scenarios
+        </a>
+    </nav>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>📦 Resources Details</h2>
+            <p class="text-muted" style="margin-top: 0.5rem;">
+                Scenario: <code>{{ scenarioName }}</code> | Scope: <span class="badge badge-scope">{{ scope }}</span>
+            </p>
+        </div>
+
+        {% if resources|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">ID</th>
+                        <th>Database</th>
+                        <th>Table</th>
+                        <th>ID Column</th>
+                        <th>Row ID</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for resource in resources %}
+                        <tr>
+                            <td>{{ resource.id }}</td>
+                            <td>
+                                {% if resource.db_name %}
+                                    <span class="badge" style="background: #9b59b6;">{{ resource.db_name }}</span>
+                                {% else %}
+                                    <span class="text-muted">default</span>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ resource.table_name }}</code></td>
+                            <td><span class="text-muted">{{ resource.id_column_name }}</span></td>
+                            <td><span class="badge badge-count">{{ resource.row_id }}</span></td>
+                            <td><span class="text-muted">{{ resource.created_at }}</span></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 1.5rem; padding: 1rem; background: #1a1a2a; border-radius: 4px;">
+                <strong style="color: #4a9eff;">Total: {{ resources|length }} resources</strong>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 3rem;">
+                <p style="font-size: 3rem; margin-bottom: 1rem;">🔍</p>
+                <p class="text-muted">No resources found for this scenario/scope.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card" style="background: #2a2a3a;">
+        <h3 style="color: #4a9eff; margin-bottom: 1rem;">🔧 Actions</h3>
+        <div style="display: flex; gap: 1rem;">
+            <form method="POST" action="{{ path('prism_office_load') }}" style="display:inline;">
+                <input type="hidden" name="scenario_name" value="{{ scenarioName }}">
+                <input type="hidden" name="scope" value="{{ scope }}" data-keep-scope>
+                <input type="hidden" name="redirect_to" value="{{ path('prism_office_resources', {name: scenarioName, scope: scope}) }}">
+                <button type="submit" class="btn btn-success" onclick="return confirm('Reload this scenario?');">
+                    🔄 Reload
+                </button>
+            </form>
+            
+            <form method="POST" action="{{ path('prism_office_purge') }}" style="display:inline;">
+                <input type="hidden" name="scenario_name" value="{{ scenarioName }}">
+                <input type="hidden" name="scope" value="{{ scope }}" data-keep-scope>
+                <input type="hidden" name="redirect_to" value="prism_office_loaded">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Purge all these resources?');">
+                    🗑️ Purge
+                </button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

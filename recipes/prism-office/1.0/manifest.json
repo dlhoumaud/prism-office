@@ -1,0 +1,8 @@
+{
+    "bundles": {
+        "PrismOffice\\PrismOfficeBundle": ["dev"]
+    },
+    "copy-from-recipe": {
+        "config/": "%CONFIG_DIR%/"
+    }
+}

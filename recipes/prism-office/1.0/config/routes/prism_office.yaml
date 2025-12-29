@@ -1,0 +1,2 @@
+_prism_office:
+    resource: '@PrismOfficeBundle/config/routes.yaml'

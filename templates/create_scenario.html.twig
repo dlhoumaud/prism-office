@@ -1,0 +1,108 @@
+{% extends '@PrismOffice/layout.html.twig' %}
+
+{% block title %}{% if edit_mode %}Edit{% else %}Create{% endif %} Scenario - PrismOffice{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>{% if edit_mode %}✏️ Edit Scenario{% else %}🎨 Create New Scenario{% endif %}</h1>
+        <p class="subtitle">{% if edit_mode %}Modify existing YAML scenario{% else %}Build a YAML scenario with visual interface{% endif %}</p>
+    </div>
+
+    <div class="builder-container">
+        <!-- Scenario Name -->
+        {% include '@PrismOffice/partials/section.html.twig' with {
+            'title': '📝 Scenario Name',
+            'extra_input': {
+                'type': 'text',
+                'id': 'scenarioName',
+                'class': 'input-field',
+                'placeholder': 'e.g. my_scenario',
+                'value': scenario_data ? scenario_data.getName() : '',
+                'readonly': edit_mode,
+                'required': true
+            },
+            'extra_info': 'Name without .yaml extension' ~ (edit_mode ? ' (read-only in edit mode)' : '')
+        } %}
+
+        <!-- Imports Section -->
+        {% include '@PrismOffice/partials/section.html.twig' with {
+            'title': '📦 Imports (Optional)',
+            'button_text': '+ Add Import',
+            'button_onclick': 'addImport()',
+            'container_id': 'importsContainer'
+        } %}
+
+
+        <!-- Variables Section -->
+        {% include '@PrismOffice/partials/section.html.twig' with {
+            'title': '📊 Variables (Optional)',
+            'button_text': '+ Add Variable',
+            'button_onclick': 'addVariable()',
+            'container_id': 'variablesContainer'
+        } %}
+
+        <!-- Load Instructions Section -->
+        {% include '@PrismOffice/partials/section.html.twig' with {
+            'title': '⚡ Load Instructions (Required)',
+            'button_text': '+ Add Load Instruction',
+            'button_onclick': 'addLoadInstruction()',
+            'container_id': 'loadInstructionsContainer'
+        } %}
+
+        <!-- Purge Instructions Section -->
+        {% include '@PrismOffice/partials/section.html.twig' with {
+            'title': '🗑️ Purge Instructions (Optional)',
+            'button_text': '+ Add Purge Instruction',
+            'button_onclick': 'addPurgeInstruction()',
+            'container_id': 'purgeInstructionsContainer',
+            'extra_button': {
+                'text': '+ Add purge_pivot: true',
+                'onclick': 'addPurgePivot()',
+                'style': 'background: #e67e22;'
+            }
+        } %}
+
+        {% include '@PrismOffice/partials/placeholders_reference.html.twig' %}
+
+        {% include '@PrismOffice/partials/preview_section.html.twig' %}
+
+        {% include '@PrismOffice/partials/floating_buttons.html.twig' with {
+            'class': 'floating-preview-btn',
+            'onclick': 'togglePreview()',
+            'id_icon': 'previewBtnIcon',
+            'icon': '📝',
+            'label': 'YAML',
+            'title': 'Show/Hide YAML Editor'
+        } %}
+
+        {% include '@PrismOffice/partials/floating_buttons.html.twig' with {
+            'class': 'floating-placeholders-btn',
+            'onclick': 'togglePlaceholders()',
+            'id_icon': 'placeholdersBtnIcon',
+            'icon': '📚',
+            'label': 'Help',
+            'title': 'Show/Hide Placeholders Reference'
+        } %}
+
+        <!-- Actions -->
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="cancelAndGoBack()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveScenario()">💾 Save Scenario</button>
+        </div>
+    </div>
+</div>
+
+{% include '@PrismOffice/styles/create_scenario.html.twig' %}
+
+{% include '@PrismOffice/scripts/create_scenario.html.twig' with {
+    'edit_mode': edit_mode,
+    'scenario_data': scenario_data,
+    'existing_scenarios': existing_scenarios,
+    'tables_with_columns': tables_with_columns,
+    'save_path': path('prism_office_create_save'),
+    'list_path': (target_folder is defined and target_folder is not empty) ? path('prism_office_directory', {path: target_folder}) : path('prism_office_list'),
+    'target_folder': target_folder|default('')
+} %}
+
+{% endblock %}

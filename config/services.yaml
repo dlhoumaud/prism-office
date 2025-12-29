@@ -1,0 +1,88 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Domain Layer
+    PrismOffice\Domain\:
+        resource: '../src/Domain/*'
+        exclude: '../src/Domain/{Entity}'
+
+    # Application Layer
+    PrismOffice\Application\:
+        resource: '../src/Application/*'
+
+    # Infrastructure Layer
+    PrismOffice\Infrastructure\:
+        resource: '../src/Infrastructure/*'
+        exclude: '../src/Infrastructure/Symfony/Controller'
+
+    # Controllers
+    PrismOffice\Infrastructure\Symfony\Controller\:
+        resource: '../src/Infrastructure/Symfony/Controller/*'
+        tags: ['controller.service_arguments']
+
+    # Repositories
+    PrismOffice\Domain\Repository\ScenarioRepositoryInterface:
+        class: PrismOffice\Infrastructure\Bridge\PrismBundleBridge
+        arguments:
+            - '@Prism\Domain\Contract\PrismRegistryInterface'
+
+    PrismOffice\Domain\Repository\LoadedScenarioRepositoryInterface:
+        class: PrismOffice\Infrastructure\Doctrine\DoctrineLoadedScenarioRepository
+        arguments:
+            - '@doctrine.dbal.default_connection'
+            - '@Prism\Domain\Contract\PrismResourceTrackerInterface'
+
+    # PrismBundle Use Cases Adapters
+    PrismOffice\Domain\Contract\LoadPrismInterface:
+        class: PrismOffice\Infrastructure\Bridge\LoadPrismAdapter
+        arguments:
+            - '@Prism\Application\UseCase\LoadPrism'
+
+    PrismOffice\Domain\Contract\PurgePrismInterface:
+        class: PrismOffice\Infrastructure\Bridge\PurgePrismAdapter
+        arguments:
+            - '@Prism\Application\UseCase\PurgePrism'
+
+    # Scenario Creation
+    PrismOffice\Application\SaveScenarioService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+    
+    PrismOffice\Application\LoadScenarioForEditService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+
+    PrismOffice\Application\ListYamlFilesService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+
+    PrismOffice\Application\DeleteScenarioService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+
+    PrismOffice\Application\CreateFolderService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+
+    PrismOffice\Application\ListDirectoryContentsService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+
+    PrismOffice\Application\DeleteFolderService:
+        arguments:
+            $prismDirectory: '%kernel.project_dir%/prism/yaml'
+
+    PrismOffice\Application\ListPhpFilesService:
+        arguments:
+            $scriptsDirectory: '%kernel.project_dir%/prism/scripts'
+
+    # Database Schema Provider
+    PrismOffice\Application\Contract\DatabaseSchemaProviderInterface:
+        class: PrismOffice\Infrastructure\Doctrine\DoctrineDatabaseSchemaProvider
+        arguments:
+            - '@doctrine.dbal.default_connection'
+            - '@doctrine'
+            - '%shared.db%' # Inject database aliases map
+            - '@cache.app' # Cache pour éviter de recharger les schémas à chaque requête

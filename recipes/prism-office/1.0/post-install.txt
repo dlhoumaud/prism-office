@@ -1,0 +1,25 @@
+<bg=blue;fg=white>                    </>
+<bg=blue;fg=white> PrismOffice Ready! </>
+<bg=blue;fg=white>                    </>
+
+  * <fg=blue>Access the web interface:</>
+    <comment>http://localhost:8000/prism/list</comment>
+
+  * <fg=blue>Available routes:</>
+    - <comment>GET  /prism/list</comment>              List all scenarios
+    - <comment>POST /prism/load</comment>              Load a scenario
+    - <comment>POST /prism/purge</comment>             Purge a scenario
+    - <comment>GET  /prism/loaded</comment>            View loaded scenarios
+    - <comment>GET  /prism/{name}/{scope}/resources</comment>  View resources
+
+  * <fg=blue>Features:</>
+    ✓ Dark theme interface
+    ✓ Scope-based isolation
+    ✓ Real-time resource tracking
+    ✓ One-click load/purge
+
+  * <fg=blue>Note:</fg> PrismOffice is <fg=yellow>enabled only in dev mode</fg>
+
+  * <fg=blue>Read the documentation at:</fg>
+    <comment>PrismOffice/README.md</comment>
+

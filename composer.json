@@ -1,0 +1,60 @@
+{
+    "name": "prism/office",
+    "description": "Web interface for managing Prism scenarios - Development tool",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": [
+        "symfony",
+        "bundle",
+        "prism",
+        "office",
+        "admin",
+        "ui",
+        "dev-tools",
+        "scenarios-management"
+    ],
+    "authors": [
+        {
+            "name": "David Lhoumaud",
+            "email": "dlhoumaud@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "symfony/framework-bundle": "^5.4|^6.0|^7.0",
+        "symfony/twig-bundle": "^5.4|^6.0|^7.0",
+        "symfony/http-kernel": "^5.4|^6.0|^7.0",
+        "symfony/dependency-injection": "^5.4|^6.0|^7.0",
+        "symfony/config": "^5.4|^6.0|^7.0",
+        "prism/bundle": "^1.0|@dev",
+        "doctrine/dbal": "^3.0|^4.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0|^11.0",
+        "phpstan/phpstan": "^1.10",
+        "squizlabs/php_codesniffer": "^3.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "PrismOffice\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\PrismOffice\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "preferred-install": {
+            "*": "dist"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "extra": {
+        "symfony": {
+            "require": "^6.0|^7.0"
+        }
+    }
+}
