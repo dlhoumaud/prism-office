@@ -3,8 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D8.1-blue.svg)](https://www.php.net/)
 [![Symfony Version](https://img.shields.io/badge/symfony-%5E6.0%7C%5E7.0-green.svg)](https://symfony.com/)
-[![Tests](https://img.shields.io/badge/tests-109%20passed-brightgreen.svg)](https://github.com/YOUR-USERNAME/prism-office/actions)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/YOUR-USERNAME/prism-office)
+[![Tests](https://img.shields.io/badge/tests-109%20passed-brightgreen.svg)](https://github.com/dlhoumaud/prism-office)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/dlhoumaud/prism-office)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%209-brightgreen.svg)](https://phpstan.org/)
 [![PSR-12](https://img.shields.io/badge/PSR12-0%20error-brightgreen.svg)](https://phpstan.org/)
 
@@ -276,4 +276,4 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 
 ## 🔗 Related Projects
 
-- [PrismBundle](../PrismBundle) - The core scenario management bundle
+- [prism-bundle](https://github.com/dlhoumaud/prism-bundle) - The core scenario management bundle
