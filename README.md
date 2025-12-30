@@ -36,6 +36,37 @@ PrismOffice is a **standalone web interface** for managing [prism-bundle](https:
 
 ## 📦 Installation
 
+### Installation via Git Repository (recommended)
+
+Once the bundle is published on GitHub, add the VCS repository to `composer.json`:
+
+**Step 1: Configure the Git repository in `composer.json`**
+
+```json
+{
+    "repositories": [
+        {
+            "type": "git",
+            "url": "https://github.com/dlhoumaud/prism-office.git"
+        }
+    ],
+    "require-dev": {
+        "prism/office": "dev-main"
+    }
+}
+```
+
+**Step 2: Install the Prism Office**
+
+```bash
+composer require prism/office:dev-main
+```
+
+> 💡 **Tip**: Once tagged versions (v1.0.0, v1.1.0, etc.) are available, you can use:
+> ```bash
+> composer require prism/bundle:^1.0
+> ```
+
 ### Option 1: Installation via Path Repository (recommended for local development)
 
 **Step 1: Copy the recipe** (for auto-configuration)
