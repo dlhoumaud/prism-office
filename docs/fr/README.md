@@ -36,7 +36,38 @@ PrismOffice est une **interface web autonome** pour gérer les scénarios [prism
 
 ## 📦 Installation
 
-### Option 1 : Installation via Path Repository (recommandé pour le développement local)
+### Option 1: Installation via Git Repository (recommandé)
+
+Une fois le bundle publié sur GitHub, ajoutez le repository VCS dans `composer.json` :
+
+**Étape 1 : Configurer le repository Git dans `composer.json`**
+
+```json
+{
+    "repositories": [
+        {
+            "type": "git",
+            "url": "https://github.com/dlhoumaud/prism-office.git"
+        }
+    ],
+    "require-dev": {
+        "prism/office": "dev-main"
+    }
+}
+```
+
+**Étape 2 : Installer le office**
+
+```bash
+composer require prism/office:dev-main
+```
+
+> 💡 **Astuce** : Une fois des versions taggées (v1.0.0, v1.1.0, etc.), vous pourrez utiliser :
+> ```bash
+> composer require prism/office:^1.0
+> ```
+
+### Option 2 : Installation via Path Repository (recommandé pour le développement local)
 
 **Étape 1 : Copier la recette** (pour la configuration automatique)
 

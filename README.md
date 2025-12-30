@@ -36,7 +36,7 @@ PrismOffice is a **standalone web interface** for managing [prism-bundle](https:
 
 ## 📦 Installation
 
-### Installation via Git Repository (recommended)
+### Option 1: Installation via Git Repository (recommended)
 
 Once the bundle is published on GitHub, add the VCS repository to `composer.json`:
 
@@ -67,7 +67,7 @@ composer require prism/office:dev-main
 > composer require prism/bundle:^1.0
 > ```
 
-### Option 1: Installation via Path Repository (recommended for local development)
+### Option 2: Installation via Path Repository (recommended for local development)
 
 **Step 1: Copy the recipe** (for auto-configuration)
 
