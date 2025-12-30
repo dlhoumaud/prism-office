@@ -351,6 +351,61 @@ small {
     box-shadow: 0 6px 16px rgba(39, 174, 96, 0.6);
 }
 
+.floating-sql-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 150px;
+    background: #f39c12;
+    color: #000;
+    border: none;
+    padding: 15px 22px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+    z-index: 9999;
+    transition: all 0.3s ease;
+}
+
+.floating-sql-btn:hover {
+    background: #f1c40f;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(243, 156, 18, 0.6);
+}
+
+/* SQL modal styles */
+#sqlModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+}
+.sql-modal-backdrop {
+    position: absolute;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.6);
+}
+.sql-modal-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 18px;
+    width: 85%;
+    max-width: 95vw;
+    border-radius: 8px;
+    z-index: 10001;
+}
+.sql-modal-card h3 {
+    margin-top: 0;
+    color: #61dafb;
+}
+
 #previewSection {
     position: fixed;
     bottom: 64px;

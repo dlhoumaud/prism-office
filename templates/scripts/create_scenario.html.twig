@@ -2612,3 +2612,115 @@ document.addEventListener('DOMContentLoaded', function() {
     loadScenarioData();
 });
 </script>
+
+<script>
+// SQL modal toggle
+function toggleSqlModal() {
+    const modal = document.getElementById('sqlModal');
+    const icon = document.getElementById('sqlBtnIcon');
+    if (!modal) return;
+    if (modal.style.display === 'none' || modal.style.display === '') {
+        modal.style.display = 'block';
+        if (icon) icon.textContent = '✖️';
+    } else {
+        modal.style.display = 'none';
+        if (icon) icon.textContent = '🧾';
+    }
+}
+
+// Called when user clicks Convert
+function convertSql() {
+    const sql = document.getElementById('sqlInput').value || '';
+    try {
+        const yaml = convertSqlToYaml(sql);
+        console.log('Converted YAML:', yaml);
+        document.getElementById('sqlInput').value = yaml;
+    } catch (e) {
+        alert('Erreur lors de la conversion SQL → YAML: ' + e.message);
+        console.error(e);
+    }
+}
+
+// Convert a CREATE TABLE SQL string into a Prism load YAML
+function convertSqlToYaml(sql) {
+    if (!sql || sql.trim() === '') throw new Error('SQL vide');
+    // Normalize
+    let s = sql.replace(/`/g, "");
+    // Extract table name and body
+    const tableMatch = s.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w_]+)\s*\(([\s\S]*?)\)\s*(?:ENGINE|CHARSET|COLLATE|;|$)/i);
+    if (!tableMatch) throw new Error('Impossible de détecter le nom de la table');
+    const tableName = tableMatch[1].trim();
+    const body = tableMatch[2];
+
+    // Split body into lines, be permissive with commas
+    const lines = body.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+    const columns = [];
+    for (let rawLine of lines) {
+        // Remove trailing comma
+        rawLine = rawLine.replace(/,$/, '').trim();
+        // Skip keys/constraints
+        if (/^(PRIMARY|UNIQUE|KEY|CONSTRAINT|INDEX|FOREIGN)/i.test(rawLine)) continue;
+        // Column definition: name type ...
+        const colMatch = rawLine.match(/^([\w_]+)\s+([^,]+)/i);
+        if (!colMatch) continue;
+        const name = colMatch[1];
+        const rest = colMatch[2].trim();
+        columns.push({ name, def: rest });
+    }
+
+    // Build YAML
+    let yaml = 'load:\n';
+    yaml += `  - table: ${tableName}\n`;
+    yaml += '    data:\n';
+
+    columns.forEach(col => {
+        const n = col.name;
+        const d = col.def.toLowerCase();
+
+        // Skip auto-increment numeric primary keys
+        if (/auto_increment/i.test(d) || /serial/i.test(d)) {
+            return;
+        }
+
+        yaml += `      # ${col.def.trim()}\n`;
+        // DEFAULT NULL -> null
+        if (/default\s+null/i.test(d)) {
+            yaml += `      ${n}: null\n`;
+            return;
+        }
+
+        // Detect types
+        if (/\b(date|datetime|timestamp)\b/.test(d)) {
+            yaml += `      ${n}: '{{ '{{' }} now {{ '}}' }}'\n`;
+            return;
+        }
+
+        if (/\b(tinyint\(1\)|bool|boolean)\b/.test(d)) {
+            yaml += `      ${n}: '1|0'\n`;
+            return;
+        }
+
+        if (/\b(int|integer|smallint|bigint|mediumint|serial)\b/.test(d)) {
+            yaml += `      ${n}: '1'\n`;
+            return;
+        }
+
+        if (/\b(float|double|decimal)\b/.test(d)) {
+            yaml += `      ${n}: '0.0'\n`;
+            return;
+        }
+
+        // For varchar/text/char -> put field name as example string
+        if (/\b(varchar|char|text|mediumtext|longtext|tinytext)\b/.test(d)) {
+            yaml += `      ${n}: '${n}'\n`;
+            return;
+        }
+
+        // Fallback: string placeholder
+        yaml += `      ${n}: '${n}'\n`;
+    });
+
+    return yaml;
+}
+</script>

@@ -85,6 +85,15 @@
             'title': 'Show/Hide Placeholders Reference'
         } %}
 
+        {% include '@PrismOffice/partials/floating_buttons.html.twig' with {
+            'class': 'floating-sql-btn',
+            'onclick': 'toggleSqlModal()',
+            'id_icon': 'sqlBtnIcon',
+            'icon': '🧾',
+            'label': 'SQL',
+            'title': 'Convert SQL → YAML'
+        } %}
+
         <!-- Actions -->
         <div class="actions">
             <button class="btn btn-secondary" onclick="cancelAndGoBack()">Cancel</button>
@@ -94,6 +103,20 @@
 </div>
 
 {% include '@PrismOffice/styles/create_scenario.html.twig' %}
+
+<!-- SQL Modal -->
+<div id="sqlModal" style="display:none;">
+    <div class="sql-modal-backdrop" onclick="toggleSqlModal()"></div>
+    <div class="sql-modal-card">
+        <h3>Convert CREATE TABLE → YAML</h3>
+        <p class="text-muted">Collez la définition SQL d'une table puis cliquez sur <strong>Convert</strong>.</p>
+        <textarea id="sqlInput" class="input-field" style="min-height:220px;height:600px;width:100%;" placeholder="CREATE TABLE ..."></textarea>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+            <button class="btn" onclick="toggleSqlModal()">Close</button>
+            <button class="btn btn-primary" onclick="convertSql()">Convert</button>
+        </div>
+    </div>
+</div>
 
 {% include '@PrismOffice/scripts/create_scenario.html.twig' with {
     'edit_mode': edit_mode,
