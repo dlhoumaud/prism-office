@@ -59,7 +59,27 @@ Once the bundle is published on GitHub, add the VCS repository to `composer.json
 **Step 2: Install the Prism Office**
 
 ```bash
-composer require prism/office:dev-main
+composer update prism/office
+```
+
+**Step 3: Configure**
+
+Create `config/packages/dev/prism_office.yaml`:
+
+```yaml
+prism_office:
+    enabled: '%kernel.debug%'
+    route_prefix: '/prism'
+```
+
+**Step 4: Load Routes**
+
+Create `config/routes/prism_office.yaml`:
+
+```yaml
+when@dev:
+    _prism_office:
+        resource: '@PrismOfficeBundle/config/routes.yaml'
 ```
 
 > 💡 **Tip**: Once tagged versions (v1.0.0, v1.1.0, etc.) are available, you can use:
@@ -136,11 +156,12 @@ prism_office:
 
 **Step 3: Load Routes**
 
-Create `config/routes/dev/prism_office.yaml`:
+Create `config/routes/prism_office.yaml`:
 
 ```yaml
-_prism_office:
-    resource: '@PrismOfficeBundle/config/routes.yaml'
+when@dev:
+    _prism_office:
+        resource: '@PrismOfficeBundle/config/routes.yaml'
 ```
 
 ---
