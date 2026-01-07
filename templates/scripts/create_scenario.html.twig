@@ -357,6 +357,29 @@ async function showAutocomplete(input, query) {
         });
     });
 
+    // Ajouter les variables définies sur les champs (simple & lookup)
+    document.querySelectorAll('[data-field-var]').forEach(varInput => {
+        const varName = varInput.value.trim();
+        if (varName) {
+            dynamicPlaceholders.push({
+                category: 'Variables',
+                code: '$' + varName,
+                description: 'Variable from field (simple)'
+            });
+        }
+    });
+
+    document.querySelectorAll('[data-field-lookup-var]').forEach(varInput => {
+        const varName = varInput.value.trim();
+        if (varName) {
+            dynamicPlaceholders.push({
+                category: 'Variables',
+                code: '$' + varName,
+                description: 'Variable from field (lookup)'
+            });
+        }
+    });
+
     // Ajouter les variables temporaires (champs du load courant)
     let loadId = null;
     const loadContainer = input.closest('[id^="load-"]');
@@ -948,6 +971,8 @@ function addField(loadId, type, data = null, isEditMode = false) {
                 <div id="field-${fieldId}-simple" class="form-group">
                     <label>Value</label>
                     <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }} or {{ '{{' }} uuid {{ '}}' }}' data-field-value="${fieldId}" value="${data?.value || ''}">
+                    <label>Export Variable (optional)</label>
+                    <input type="text" class="input-field" placeholder="name_user_1" data-field-var="${fieldId}" value="${data?.var || ''}">
                     <div class="placeholder-hint">Examples: {{ '{{' }} scope {{ '}}' }}, {{ '{{' }} uuid {{ '}}' }}, {{ '{{' }} hash('pwd') {{ '}}' }}, {{ '{{' }} now {{ '}}' }}, {{ '{{' }} math(10*2) {{ '}}' }}</div>
                 </div>
                 <div id="field-${fieldId}-lookup" class="form-group" style="display: none;">
@@ -962,6 +987,8 @@ function addField(loadId, type, data = null, isEditMode = false) {
                     <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-field-lookup-where-val="${fieldId}" value="${data?.lookupWhereVal || ''}">
                     <label>Return Column</label>
                     <input type="text" class="input-field" placeholder="id" data-field-lookup-return="${fieldId}" data-autocomplete="column" data-table-ref-lookup="lookup-table-${fieldId}" value="${data?.lookupReturn || ''}">
+                    <label>Export Variable (optional)</label>
+                    <input type="text" class="input-field" placeholder="name_user_1" data-field-lookup-var="${fieldId}" value="${data?.lookupVar || ''}">
                     <div class="helper-text">This will lookup the id from users table where username matches</div>
                 </div>
             </div>
@@ -1568,13 +1595,21 @@ function collectFormData() {
                     if (simpleDiv && simpleDiv.style.display !== 'none') {
                         // Simple value
                         const value = document.querySelector(`[data-field-value="${fieldId}"]`).value;
+                        const varName = document.querySelector(`[data-field-var="${fieldId}"]`)?.value.trim() || '';
                         // Ne pas trim pour préserver les chaînes vides et null
+                        let parsedValue;
                         if (value === 'null') {
-                            loadData[fieldName] = null;
+                            parsedValue = null;
                         } else if (value === '') {
-                            loadData[fieldName] = '';
+                            parsedValue = '';
                         } else {
-                            loadData[fieldName] = value;
+                            parsedValue = value;
+                        }
+
+                        if (varName) {
+                            loadData[fieldName] = { var: varName, value: parsedValue };
+                        } else {
+                            loadData[fieldName] = parsedValue;
                         }
                     } else {
                         // Lookup
@@ -1594,6 +1629,11 @@ function collectFormData() {
                             };
                             if (lookupDb) {
                                 loadData[fieldName].db = lookupDb;
+                            }
+                            // Optional export variable for lookup
+                            const lookupVar = document.querySelector(`[data-field-lookup-var="${fieldId}"]`)?.value.trim() || '';
+                            if (lookupVar) {
+                                loadData[fieldName].var = lookupVar;
                             }
                         }
                     }
@@ -1831,6 +1871,9 @@ function generateYAML(data) {
                 if (typeof value === 'object' && value !== null && value.table) {
                     // Lookup
                     yaml += `      ${key}:\n`;
+                    if (value.var) {
+                        yaml += `        var: ${value.var}\n`;
+                    }
                     if (value.db) {
                         yaml += `        db: "${value.db}"\n`;
                     }
@@ -1840,6 +1883,11 @@ function generateYAML(data) {
                         yaml += `          ${wk}: ${formatYamlValue(wv)}\n`;
                     });
                     yaml += `        return: ${value.return}\n`;
+                } else if (typeof value === 'object' && value !== null && value.var !== undefined) {
+                    // Simple field that exports a variable
+                    yaml += `      ${key}:\n`;
+                    yaml += `        var: ${value.var}\n`;
+                    yaml += `        value: ${formatYamlValue(value.value)}\n`;
                 } else {
                     yaml += `      ${key}: ${formatYamlValue(value)}\n`;
                 }
@@ -2097,7 +2145,19 @@ function loadScenarioData(providedData = null) {
                     lookupDb: fieldValue.database || fieldValue.db || '',
                     lookupWhereCol: whereCol,
                     lookupWhereVal: whereVal,
-                    lookupReturn: fieldValue.return
+                    lookupReturn: fieldValue.return,
+                    lookupVar: fieldValue.var || ''
+                }, true);
+            } else if (typeof fieldValue === 'object' && fieldValue !== null && fieldValue.var !== undefined && fieldValue.value !== undefined) {
+                // Simple value that exports a variable
+                let displayValue = fieldValue.value;
+                if (fieldValue.value === null) displayValue = 'null';
+                else if (fieldValue.value === '') displayValue = '';
+                addField(loadId, 'data', {
+                    name: fieldName,
+                    value: displayValue,
+                    var: fieldValue.var,
+                    isLookup: false
                 }, true);
             } else {
                 // Valeur simple - convertir null en string "null" pour le formulaire
