@@ -25,6 +25,19 @@
             'extra_info': 'Name without .yaml extension' ~ (edit_mode ? ' (read-only in edit mode)' : '')
         } %}
 
+        <!-- Scenario Info (global) -->
+        {% include '@PrismOffice/partials/section.html.twig' with {
+            'title': 'ℹ️ Scenario Info (optional)',
+            'extra_input': {
+                'type': 'text',
+                'id': 'scenarioInfo',
+                'class': 'input-field',
+                'placeholder': "Short description of the scenario",
+                'value': scenario_data ? (scenario_data.getInfo()|default('')) : ''
+            },
+            'extra_info': 'This text will be stored as top-level "info" in the YAML'
+        } %}
+
         <!-- Imports Section -->
         {% include '@PrismOffice/partials/section.html.twig' with {
             'title': '📦 Imports',

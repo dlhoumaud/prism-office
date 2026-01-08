@@ -91,9 +91,9 @@
 
                         {# Fichiers YAML #}
                         {% for scenario in yaml_files %}
-                            {% set full_scenario_path = current_path ? current_path ~ '/' ~ scenario : scenario %}
+                            {% set full_scenario_path = current_path ? current_path ~ '/' ~ scenario.name : scenario.name %}
                             <tr>
-                                <td>📑 <code><a href="{{ path('prism_office_create', {edit: full_scenario_path}) }}" title="Edit YAML" style="color: inherit; text-decoration: none;">{{ scenario }}</a></code></td>
+                                <td>📑 <code><a href="{{ path('prism_office_create', {edit: full_scenario_path}) }}" title="Edit YAML" style="color: inherit; text-decoration: none;">{{ scenario.display }}</a></code></td>
                                 <td>
                                     <div class="actions">
                                         <form method="POST" action="{{ path('prism_office_load') }}" style="display:inline;">
@@ -132,7 +132,7 @@
                                             <button 
                                                 type="submit" 
                                                 class="btn btn-danger btn-small"
-                                                onclick="return confirm('⚠️ DELETE file \"{{ scenario }}\"? Cannot be undone!');"
+                                                onclick="return confirm('⚠️ DELETE file "{{ scenario.name }}"? Cannot be undone!');"
                                                 style="background: #8b0000;"
                                             >
                                                 🗑️ Delete

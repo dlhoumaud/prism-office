@@ -15,13 +15,15 @@ final class ScenarioDefinition
      * @param array<string, string> $variables Variables globales (nom => valeur)
      * @param array<LoadInstruction> $loadInstructions Instructions de chargement
      * @param array<PurgeInstruction> $purgeInstructions Instructions de purge custom
+     * @param string|null $info Note globale optionnelle du scénario
      */
     public function __construct(
         private readonly string $name,
         private readonly array $imports = [],
         private readonly array $variables = [],
         private readonly array $loadInstructions = [],
-        private readonly array $purgeInstructions = []
+        private readonly array $purgeInstructions = [],
+        private readonly ?string $info = null
     ) {
     }
 
@@ -60,6 +62,11 @@ final class ScenarioDefinition
     public function getPurgeInstructions(): array
     {
         return $this->purgeInstructions;
+    }
+
+    public function getInfo(): ?string
+    {
+        return $this->info;
     }
 
     public function hasImports(): bool

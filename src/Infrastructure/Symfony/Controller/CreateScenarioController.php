@@ -97,10 +97,68 @@ final class CreateScenarioController extends AbstractController
 
             $allVariables = $this->extractVariablesFromImports($imports);
 
-            return $this->json(['variables' => $allVariables]);
+            $allInfos = $this->extractInfosFromImports($imports);
+
+            return $this->json([
+                'variables' => $allVariables,
+                'infos' => $allInfos,
+            ]);
         } catch (\Exception $e) {
             return $this->json(['variables' => [], 'error' => $e->getMessage()], 400);
         }
+    }
+
+    /**
+     * Extract top-level "info" from imported YAML files (recursively)
+     *
+     * @param array<string> $imports
+     * @param array<string> $visited
+     * @return array<string, string|null>
+     */
+    private function extractInfosFromImports(array $imports, array $visited = []): array
+    {
+        $infos = [];
+        $projectDir = $this->getParameter('kernel.project_dir');
+        if (!is_string($projectDir)) {
+            return [];
+        }
+        $scenariosPath = $projectDir . '/prism/yaml';
+
+        foreach ($imports as $importPath) {
+            if (in_array($importPath, $visited, true)) {
+                continue;
+            }
+
+            $visited[] = $importPath;
+
+            $filePath = $scenariosPath . '/' . $importPath . '.yaml';
+            if (!file_exists($filePath)) {
+                continue;
+            }
+
+            try {
+                $content = file_get_contents($filePath);
+                if ($content === false) {
+                    continue;
+                }
+
+                $yaml = \Symfony\Component\Yaml\Yaml::parse($content);
+                if (!is_array($yaml)) {
+                    continue;
+                }
+
+                $infos[$importPath] = isset($yaml['info']) && is_string($yaml['info']) ? $yaml['info'] : null;
+
+                if (isset($yaml['import']) && is_array($yaml['import'])) {
+                    $nested = $this->extractInfosFromImports($yaml['import'], $visited);
+                    $infos = array_merge($infos, $nested);
+                }
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+
+        return $infos;
     }
     #[Route('/prism/create/database-schema', name: 'prism_office_get_database_schema', methods: ['POST'])]
     public function getDatabaseSchema(Request $request): Response
@@ -164,6 +222,7 @@ final class CreateScenarioController extends AbstractController
     private function buildScenarioFromRequest(array $data): ScenarioDefinition
     {
         $name = $data['name'] ?? throw new \InvalidArgumentException('Scenario name is required');
+        $info = $data['info'] ?? null;
 
         // Imports
         $imports = $data['imports'] ?? [];
@@ -187,7 +246,8 @@ final class CreateScenarioController extends AbstractController
             $pivot = $loadItem['pivot'] ?? null;
             $database = $loadItem['database'] ?? null;
 
-            $loadInstructions[] = new LoadInstruction($table, $instructionData, $types, $pivot, $database);
+            $instructionInfo = $loadItem['info'] ?? null;
+            $loadInstructions[] = new LoadInstruction($table, $instructionData, $types, $pivot, $database, $instructionInfo);
         }
 
         // Purge instructions
@@ -205,7 +265,8 @@ final class CreateScenarioController extends AbstractController
             $purgePivot = $purgeItem['purge_pivot'] ?? false;
             $database = $purgeItem['database'] ?? null;
 
-            $purgeInstructions[] = new PurgeInstruction($table, $where, $purgePivot, $database);
+            $purgeInstructionInfo = $purgeItem['info'] ?? null;
+            $purgeInstructions[] = new PurgeInstruction($table, $where, $purgePivot, $database, $purgeInstructionInfo);
         }
 
         return new ScenarioDefinition(
@@ -213,7 +274,8 @@ final class CreateScenarioController extends AbstractController
             $imports,
             $variables,
             $loadInstructions,
-            $purgeInstructions
+            $purgeInstructions,
+            $info
         );
     }
 

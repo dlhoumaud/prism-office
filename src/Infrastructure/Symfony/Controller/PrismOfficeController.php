@@ -9,6 +9,7 @@ use PrismOffice\Application\ListYamlFilesService;
 use PrismOffice\Application\ListLoadedScenariosService;
 use PrismOffice\Application\ListDirectoryContentsService;
 use PrismOffice\Application\ListPhpFilesService;
+use PrismOffice\Application\LoadScenarioForEditService;
 use PrismOffice\Application\LoadScenarioService;
 use PrismOffice\Application\PurgeScenarioService;
 use PrismOffice\Application\DeleteScenarioService;
@@ -38,6 +39,7 @@ final class PrismOfficeController extends AbstractController
         ListDirectoryContentsService $listContents,
         ListPhpFilesService $listPhpFiles,
         ListLoadedScenariosService $listLoadedScenarios,
+        LoadScenarioForEditService $loadForEdit,
         Request $request
     ): Response {
         // Générer un scope aléatoire si aucun n'existe en session
@@ -54,10 +56,26 @@ final class PrismOfficeController extends AbstractController
         // Sauvegarder le dossier courant en session
         $session->set('prism_last_folder', '');
 
+        // Build display entries for yaml files: prefer top-level info if present
+        $yamlFilesDisplay = [];
+        foreach ($yamlContents['files'] as $file) {
+            $full = $file;
+            try {
+                $scenarioDef = $loadForEdit->execute($full);
+                $info = $scenarioDef->getInfo();
+            } catch (\Exception $e) {
+                $info = null;
+            }
+            $yamlFilesDisplay[] = [
+                'name' => $file,
+                'display' => $info && is_string($info) && $info !== '' ? $info : $file,
+            ];
+        }
+
         return $this->render('@PrismOffice/list.html.twig', [
             'php_scenarios' => $phpScenarios,
             'yaml_folders' => $yamlContents['folders'],
-            'yaml_files' => $yamlContents['files'],
+            'yaml_files' => $yamlFilesDisplay,
             'php_folders' => $phpContents['folders'],
             'php_files' => $phpContents['files'],
             'loadedScenarios' => $loadedScenarios,
@@ -79,6 +97,7 @@ final class PrismOfficeController extends AbstractController
         ListDirectoryContentsService $listContents,
         ListPhpFilesService $listPhpFiles,
         ListLoadedScenariosService $listLoadedScenarios,
+        LoadScenarioForEditService $loadForEdit,
         Request $request
     ): Response {
         // Générer un scope aléatoire si aucun n'existe en session
@@ -98,10 +117,27 @@ final class PrismOfficeController extends AbstractController
         // Générer le breadcrumb
         $breadcrumb = $this->generateBreadcrumb($path);
 
+        // Build display entries for yaml files: prefer top-level info if present
+        $yamlFilesDisplay = [];
+        foreach ($yamlContents['files'] as $file) {
+            // file is relative to current path
+            $full = $path ? $path . '/' . $file : $file;
+            try {
+                $scenarioDef = $loadForEdit->execute($full);
+                $info = $scenarioDef->getInfo();
+            } catch (\Exception $e) {
+                $info = null;
+            }
+            $yamlFilesDisplay[] = [
+                'name' => $file,
+                'display' => $info && is_string($info) && $info !== '' ? $info : $file,
+            ];
+        }
+
         return $this->render('@PrismOffice/list.html.twig', [
             'php_scenarios' => $phpScenarios,
             'yaml_folders' => $yamlContents['folders'],
-            'yaml_files' => $yamlContents['files'],
+            'yaml_files' => $yamlFilesDisplay,
             'php_folders' => $phpContents['folders'],
             'php_files' => $phpContents['files'],
             'loadedScenarios' => $loadedScenarios,

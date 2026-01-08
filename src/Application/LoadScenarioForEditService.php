@@ -39,6 +39,12 @@ final class LoadScenarioForEditService
             throw new \RuntimeException('Invalid YAML structure');
         }
 
+        // Top-level info
+        $scenarioInfo = null;
+        if (isset($yaml['info'])) {
+            $scenarioInfo = is_string($yaml['info']) ? $yaml['info'] : null;
+        }
+
         // Parse imports
         $imports = [];
         if (isset($yaml['import']) && is_array($yaml['import'])) {
@@ -64,9 +70,10 @@ final class LoadScenarioForEditService
                 $types = $loadEntry['types'] ?? [];
                 $pivot = $loadEntry['pivot'] ?? null;
                 $database = $loadEntry['database'] ?? $loadEntry['db'] ?? null;
+                $instructionInfo = $loadEntry['info'] ?? null;
 
                 if ($table !== '') {
-                    $loadInstructions[] = new LoadInstruction($table, $data, $types, $pivot, $database);
+                    $loadInstructions[] = new LoadInstruction($table, $data, $types, $pivot, $database, $instructionInfo);
                 }
             }
         }
@@ -83,9 +90,10 @@ final class LoadScenarioForEditService
                 $where = $purgeEntry['where'] ?? [];
                 $purgePivot = $purgeEntry['purge_pivot'] ?? false;
                 $database = $purgeEntry['database'] ?? $purgeEntry['db'] ?? null;
+                $instructionInfo = $purgeEntry['info'] ?? null;
 
                 if ($table !== '') {
-                    $purgeInstructions[] = new PurgeInstruction($table, $where, $purgePivot, $database);
+                    $purgeInstructions[] = new PurgeInstruction($table, $where, $purgePivot, $database, $instructionInfo);
                 }
             }
         }
@@ -95,7 +103,8 @@ final class LoadScenarioForEditService
             $imports,
             $variables,
             $loadInstructions,
-            $purgeInstructions
+            $purgeInstructions,
+            $scenarioInfo
         );
     }
 }

@@ -93,6 +93,11 @@ final class SaveScenarioService
 
         $data = [];
 
+        // Global scenario info
+        if ($scenario->getInfo()) {
+            $data['info'] = $normalize($scenario->getInfo());
+        }
+
         // Section import
         if ($scenario->hasImports()) {
             $data['import'] = $normalize($scenario->getImports());
@@ -111,6 +116,11 @@ final class SaveScenarioService
                     'table' => $instruction->getTable(),
                     'data' => $normalize($instruction->getData()),
                 ];
+
+                // Instruction-level info
+                if (method_exists($instruction, 'getInfo') && $instruction->getInfo()) {
+                    $loadEntry['info'] = $normalize($instruction->getInfo());
+                }
 
                 if ($instruction->getDatabase()) {
                     $loadEntry['db'] = $instruction->getDatabase();
@@ -143,6 +153,11 @@ final class SaveScenarioService
 
                 if ($instruction->getPurgePivot()) {
                     $purgeEntry['purge_pivot'] = true;
+                }
+
+                // Instruction-level info for purge
+                if (method_exists($instruction, 'getInfo') && $instruction->getInfo()) {
+                    $purgeEntry['info'] = $normalize($instruction->getInfo());
                 }
 
                 $data['purge'][] = $purgeEntry;

@@ -151,8 +151,9 @@ let autocompleteState = {
     container: null
 };
 
-// Cache for import variables
+// Cache for import variables and import infos
 let importVariablesCache = {};
+let importInfosCache = {};
 let importVariablesCacheTimestamp = 0;
 
 // Debounce function pour éviter trop d'appels
@@ -296,15 +297,18 @@ async function fetchImportVariables() {
         }
     });
 
-    // If no imports, return empty
+    // If no imports, return empty shape
     if (imports.length === 0) {
-        return {};
+        return { variables: {}, infos: {} };
     }
 
     // Check cache (valid for 5 seconds)
     const now = Date.now();
     if (importVariablesCacheTimestamp > 0 && (now - importVariablesCacheTimestamp) < 5000) {
-        return importVariablesCache;
+        return {
+            variables: importVariablesCache,
+            infos: importInfosCache,
+        };
     }
 
     try {
@@ -318,23 +322,28 @@ async function fetchImportVariables() {
 
         if (!response.ok) {
             console.error('Failed to fetch import variables');
-            return {};
+            return { variables: {}, infos: {} };
         }
 
         const data = await response.json();
         importVariablesCache = data.variables || {};
+        importInfosCache = data.infos || {};
         importVariablesCacheTimestamp = now;
         
-        return importVariablesCache;
+        return {
+            variables: importVariablesCache,
+            infos: importInfosCache,
+        };
     } catch (error) {
         console.error('Error fetching import variables:', error);
-        return {};
+        return { variables: {}, infos: {} };
     }
 }
 
 // Invalidate import variables cache when imports change
 function invalidateImportCache() {
     importVariablesCache = {};
+    importInfosCache = {};
     importVariablesCacheTimestamp = 0;
 }
 
@@ -357,8 +366,10 @@ async function showAutocomplete(input, query) {
         }
     });
 
-    // Ajouter les variables des imports
-    const importVars = await fetchImportVariables();
+    // Ajouter les variables des imports (et récupérer aussi les infos côté serveur)
+    const importData = await fetchImportVariables();
+    const importVars = importData.variables || {};
+    // const importInfos = importData.infos || {}; // kept in cache importInfosCache
     Object.entries(importVars).forEach(([varName, source]) => {
         dynamicPlaceholders.push({
             category: 'Import Variables',
@@ -869,7 +880,7 @@ function addLoadInstruction() {
             <div class="item-card-header" onclick="toggleInstruction('load-${id}')">
                 <span class="item-card-title">
                     <button class="item-card-toggle" id="load-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('load-${id}')">${isEditMode ? '▶' : '▼'}</button>
-                    Load Instruction #${id + 1} <code id="load-${id}-table-info" style="color: #e67e22; background: rgba(230, 126, 34, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
+                    <span id="load-${id}-table-info">Load #${id}</span> <code id="load-${id}-info" style="color: #e67e22; background: rgba(230, 126, 34, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
                 </span>
                 <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('load-${id}')">Remove</button>
             </div>
@@ -882,6 +893,11 @@ function addLoadInstruction() {
             <div class="form-group">
                 <label>Table Name</label>
                 <input type="text" class="input-field" placeholder="users" data-load-table="${id}" data-autocomplete="table" oninput="updateLoadTitle(${id})" onchange="updateLoadTitle(${id})">
+            </div>
+            <div class="form-group">
+                <label>Info (optional)</label>
+                <input type="text" class="input-field" placeholder="Short note about this instruction" data-load-info="${id}" oninput="updateLoadTitle(${id})" onchange="updateLoadTitle(${id})">
+                <small>Will be saved as 'info' on this load instruction in YAML</small>
             </div>
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
@@ -1240,7 +1256,7 @@ function addPurgeInstruction() {
             <div class="item-card-header" onclick="toggleInstruction('purge-${id}')">
                 <span class="item-card-title">
                     <button class="item-card-toggle" id="purge-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('purge-${id}')">${isEditMode ? '▶' : '▼'}</button>
-                    Purge Instruction #${id + 1} <code id="purge-${id}-table-info" style="color: #e67e22; background: rgba(230, 126, 34, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
+                    <span id="purge-${id}-table-info">Purge #${id}</span> <code id="purge-${id}-info" style="color: #e67e22; background: rgba(230, 126, 34, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
                 </span>
                 <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('purge-${id}')">Remove</button>
             </div>
@@ -1253,6 +1269,11 @@ function addPurgeInstruction() {
             <div class="form-group">
                 <label>Table Name</label>
                 <input type="text" class="input-field" placeholder="users" data-purge-table="${id}" data-autocomplete="table" oninput="updatePurgeTitle(${id})" onchange="updatePurgeTitle(${id})">
+            </div>
+            <div class="form-group">
+                <label>Info (optional)</label>
+                <input type="text" class="input-field" placeholder="Short note about this purge instruction" data-purge-info="${id}" oninput="updatePurgeTitle(${id})" onchange="updatePurgeTitle(${id})">
+                <small>Will be saved as 'info' on this purge instruction in YAML</small>
             </div>
             <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -1377,17 +1398,33 @@ function updateLoadTitle(id) {
     const dbInput = document.querySelector(`[data-load-db="${id}"]`);
     const tableInput = document.querySelector(`[data-load-table="${id}"]`);
     const titleElement = document.getElementById(`load-${id}-table-info`);
+    const infoInput = document.querySelector(`[data-load-info="${id}"]`);
+    const infoElement = document.getElementById(`load-${id}-info`);
     
     if (titleElement && tableInput) {
         const db = dbInput?.value.trim() || '';
         const table = tableInput.value.trim();
-        
+        const infoInput = document.querySelector(`[data-load-info="${id}"]`);
+        const info = infoInput ? infoInput.value.trim() : '';
+
         if (table) {
-            titleElement.textContent = db ? `${db}.${table}` : table;
+            let text = db ? `${db}.${table}` : table;
+            titleElement.textContent = text;
             titleElement.style.display = 'inline';
         } else {
             titleElement.textContent = '';
             titleElement.style.display = 'none';
+        }
+    }
+
+    if (infoElement && infoInput) {
+        const info = infoInput.value.trim();
+        if (info) {
+            infoElement.textContent = info;
+            infoElement.style.display = 'inline';
+        } else {
+            infoElement.textContent = '';
+            infoElement.style.display = 'none';
         }
     }
 }
@@ -1397,17 +1434,32 @@ function updatePurgeTitle(id) {
     const dbInput = document.querySelector(`[data-purge-db="${id}"]`);
     const tableInput = document.querySelector(`[data-purge-table="${id}"]`);
     const titleElement = document.getElementById(`purge-${id}-table-info`);
+    const infoInput = document.querySelector(`[data-purge-info="${id}"]`);
+    const infoElement = document.getElementById(`purge-${id}-info`);
+
     
     if (titleElement && tableInput) {
         const db = dbInput?.value.trim() || '';
         const table = tableInput.value.trim();
-        
+
         if (table) {
-            titleElement.textContent = db ? `${db}.${table}` : table;
+            let text = db ? `${db}.${table}` : table;
+            titleElement.textContent = text;
             titleElement.style.display = 'inline';
         } else {
             titleElement.textContent = '';
             titleElement.style.display = 'none';
+        }
+    }
+
+    if (infoElement && infoInput) {
+        const info = infoInput.value.trim();
+        if (info) {
+            infoElement.textContent = info;
+            infoElement.style.display = 'inline';
+        } else {
+            infoElement.textContent = '';
+            infoElement.style.display = 'none';
         }
     }
 }
@@ -1438,7 +1490,25 @@ function updateImportTitle(id) {
         const importPath = textInput?.value.trim() || '';
 
         if (importPath) {
-            titleElement.textContent = importPath;
+            // If we have an info string for this import (from server), show it instead of the raw path
+            const importInfo = importInfosCache[importPath] ?? null;
+            if (importInfo && String(importInfo).trim() !== '') {
+                titleElement.textContent = importInfo;
+            } else {
+                // If we don't have cached info yet, try to fetch it asynchronously
+                titleElement.textContent = importPath; // provisional
+                if (!importInfosCache[importPath]) {
+                    fetchImportVariables().then(data => {
+                        const infos = data.infos || {};
+                        // merge into cache
+                        importInfosCache = Object.assign({}, importInfosCache, infos);
+                        const fetched = importInfosCache[importPath] ?? null;
+                        if (fetched && String(fetched).trim() !== '') {
+                            titleElement.textContent = fetched;
+                        }
+                    }).catch(() => {});
+                }
+            }
             titleElement.style.display = 'inline';
         } else {
             titleElement.textContent = '';
@@ -1573,6 +1643,7 @@ function updatePreview() {
 function collectFormData() {
     const data = {
         name: document.getElementById('scenarioName').value.trim(),
+        info: document.getElementById('scenarioInfo') ? document.getElementById('scenarioInfo').value.trim() : '',
         imports: [],
         variables: {},
         load: [],
@@ -1687,6 +1758,11 @@ function collectFormData() {
         }
         
         const instruction = { table, data: loadData };
+        // Instruction-level info
+        const infoInput = document.querySelector(`[data-load-info="${id}"]`);
+        if (infoInput && infoInput.value.trim()) {
+            instruction.info = infoInput.value.trim();
+        }
         if (database) {
             instruction.database = database;
         }
@@ -1846,6 +1922,11 @@ function collectFormData() {
         }
         
         const purgeInstr = { table, where };
+        const infoInput = document.querySelector(`[data-purge-info="${id}"]`);
+        const info = infoInput ? infoInput.value.trim() : '';
+        if (info) {
+            purgeInstr.info = info;
+        }
         if (database) {
             purgeInstr.database = database;
         }
@@ -1863,6 +1944,13 @@ function collectFormData() {
 // Générer le YAML à partir des données
 function generateYAML(data) {
     let yaml = `# Scenario: ${data.name}\n#\n# Created by PrismOffice\n#\n# Usage:\n#   php bin/console app:prism:load ${data.name} --scope=YOUR_SCOPE\n#   php bin/console app:prism:purge ${data.name} --scope=YOUR_SCOPE\n\n`;
+    // Helper to escape double quotes in arbitrary strings
+    const escapeString = (s) => String(s).replace(/"/g, '\\"');
+
+    // Global scenario info
+    if (data.info && data.info.length > 0) {
+        yaml += `info: "${escapeString(data.info)}"\n\n`;
+    }
     
     // Helper function pour formater les valeurs YAML
     const formatYamlValue = (value) => {
@@ -1903,6 +1991,9 @@ function generateYAML(data) {
             yaml += `  - table: ${load.table}\n`;
             if (load.database) {
                 yaml += `    db: "${load.database}"\n`;
+            }
+            if (load.info) {
+                yaml += `    info: "${escapeString(load.info)}"\n`;
             }
             yaml += '    data:\n';
             Object.entries(load.data).forEach(([key, value]) => {
@@ -1977,6 +2068,9 @@ function generateYAML(data) {
                 yaml += `  - table: ${purge.table}\n`;
                 if (purge.database) {
                     yaml += `    db: "${purge.database}"\n`;
+                }
+                if (purge.info) {
+                    yaml += `    info: "${escapeString(purge.info)}"\n`;
                 }
                 yaml += '    where:\n';
                 Object.entries(purge.where).forEach(([key, value]) => {
@@ -2063,6 +2157,7 @@ function loadScenarioData(providedData = null) {
         console.log({{ scenario_data|json_encode|raw }});
         data = {
             name: {{ scenario_data.getName()|json_encode|raw }},
+            info: {{ scenario_data.getInfo()|json_encode|raw }},
             imports: {{ scenario_data.getImports()|json_encode|raw }},
             variables: {{ scenario_data.getVariables()|json_encode|raw }},
             load: [
@@ -2072,7 +2167,8 @@ function loadScenarioData(providedData = null) {
                     data: {{ instruction.getData()|json_encode|raw }},
                     types: {{ instruction.getTypes()|json_encode|raw }},
                     pivot: {{ instruction.getPivot()|json_encode|raw }},
-                    database: {{ instruction.getDatabase()|json_encode|raw }}
+                    database: {{ instruction.getDatabase()|json_encode|raw }},
+                    info: {{ instruction.getInfo()|json_encode|raw }}
                 }{{ loop.last ? '' : ',' }}
                 {% endfor %}
             ],
@@ -2082,6 +2178,7 @@ function loadScenarioData(providedData = null) {
                     table: {{ instruction.getTable()|json_encode|raw }},
                     where: {{ instruction.getWhere()|json_encode|raw }},
                     purge_pivot: {{ instruction.getPurgePivot() ? 'true' : 'false' }},
+                    info: {{ instruction.getInfo()|json_encode|raw }},
                     database: {{ instruction.getDatabase()|json_encode|raw }}
                 }{{ loop.last ? '' : ',' }}
                 {% endfor %}
@@ -2164,6 +2261,12 @@ function loadScenarioData(providedData = null) {
             if (dbInput) {
                 dbInput.value = loadInstr.database;
             }
+        }
+
+        // Set instruction-level info if present
+        const infoInput = lastContainer.querySelector(`[data-load-info="${loadId}"]`);
+        if (infoInput && loadInstr.info) {
+            infoInput.value = loadInstr.info;
         }
         
         // Update title for edit mode
@@ -2302,6 +2405,11 @@ function loadScenarioData(providedData = null) {
                     dbInput.value = purgeInstr.database;
                 }
             }
+            // Set instruction-level info if present
+            const purgeInfoInput = lastContainer.querySelector(`[data-purge-info="${purgeId}"]`);
+            if (purgeInfoInput && purgeInstr.info) {
+                purgeInfoInput.value = purgeInstr.info;
+            }
             
             // Update title for edit mode
             updatePurgeTitle(purgeId);
@@ -2383,6 +2491,10 @@ function parseYAML(yamlText) {
         } else if (trimmed === 'purge:') {
             currentSection = 'purge';
             continue;
+        } else if (trimmed.startsWith('info:') && !currentSection) {
+            // Top-level scenario info
+            result.info = trimmed.split(':').slice(1).join(':').trim().replace(/^"|"$/g, '');
+            continue;
         }
         
         // Parse imports
@@ -2425,6 +2537,9 @@ function parseYAML(yamlText) {
                 };
                 currentDataSection = null;
             } else if (currentLoadItem) {
+                if (trimmed.startsWith('info:')) {
+                    currentLoadItem.info = trimmed.split(':').slice(1).join(':').trim().replace(/^"|"$/g, '');
+                } else
                 if (trimmed.startsWith('table:') && !currentLoadItem.table) {
                     currentLoadItem.table = trimmed.split(':')[1].trim();
                 } else if (trimmed === 'data:') {
@@ -2592,7 +2707,9 @@ function parseYAML(yamlText) {
             } else if (trimmed === '- purge_pivot: true') {
                 result.purge.push({ purge_pivot: true });
             } else if (currentPurgeItem) {
-                if (trimmed === 'where:') {
+                if (trimmed.startsWith('info:')) {
+                    currentPurgeItem.info = trimmed.split(':').slice(1).join(':').trim().replace(/^"|"$/g, '');
+                } else if (trimmed === 'where:') {
                     currentDataSection = 'where';
                 } else if (currentDataSection === 'where' && trimmed.includes(':')) {
                     const [key, ...valueParts] = trimmed.split(':');
@@ -2686,6 +2803,11 @@ function applyYamlToBuilder() {
         const scenarioNameInput = document.getElementById('scenarioName');
         if (scenarioNameInput && !scenarioNameInput.hasAttribute('readonly') && data.name) {
             scenarioNameInput.value = data.name;
+        }
+        // Set scenario info if present
+        const scenarioInfoInput = document.getElementById('scenarioInfo');
+        if (scenarioInfoInput && data.info) {
+            scenarioInfoInput.value = data.info;
         }
         
         // Utiliser loadScenarioData avec les données parsées

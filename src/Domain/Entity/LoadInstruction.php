@@ -15,13 +15,15 @@ final class LoadInstruction
      * @param array<string, string> $types Types de données optionnels (colonne => type)
      * @param array<string, mixed>|null $pivot Configuration du pivot custom
      * @param string|null $database Nom de la base de données (optionnel)
+     * @param string|null $info Note optionnelle associée à l'instruction
      */
     public function __construct(
         private readonly string $table,
         private readonly array $data,
         private readonly array $types = [],
         private readonly ?array $pivot = null,
-        private readonly ?string $database = null
+        private readonly ?string $database = null,
+        private readonly ?string $info = null
     ) {
     }
 
@@ -57,6 +59,11 @@ final class LoadInstruction
     public function getDatabase(): ?string
     {
         return $this->database;
+    }
+
+    public function getInfo(): ?string
+    {
+        return $this->info;
     }
 
     public function hasTypes(): bool
