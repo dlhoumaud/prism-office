@@ -788,6 +788,7 @@ function addImport() {
                     <button class="item-card-toggle" id="import-${id}-toggle" onclick="event.stopPropagation(); toggleInstruction('import-${id}')">${isEditMode ? '▶' : '▼'}</button>
                     Import #${id + 1} <code id="import-${id}-path-info" style="color: #3498db; background: rgba(52, 152, 219, 0.1); padding: 2px 6px; border-radius: 3px; display: none;"></code>
                 </span>
+                <button class="item-card-edit" onclick="event.stopPropagation(); openImportCreate(${id})">Edit</button>
                 <button class="item-card-remove" onclick="event.stopPropagation(); removeItem('import-${id}')">Remove</button>
             </div>
             <div class="item-card-body ${collapsedClass}" id="import-${id}-body">
@@ -1353,6 +1354,22 @@ function toggleInstruction(instructionId) {
             toggle.textContent = '▶';
         }
     }
+}
+
+// Open create scenario page for an import (redirect)
+function openImportCreate(id) {
+    const input = document.querySelector(`[data-import-id="${id}"]`);
+    if (!input) return;
+    const path = input.value.trim();
+    if (!path) {
+        alert('Please enter the import path before editing');
+        input.focus();
+        return;
+    }
+
+    // Build URL using Symfony path helper as base, append query param
+    const target = "{{ path('prism_office_create') }}" + '?edit=' + path;
+    window.location.href = target;
 }
 
 // Mettre à jour le titre d'une instruction load avec dbname.tablename
