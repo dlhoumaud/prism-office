@@ -162,6 +162,16 @@ function debounce(func, delay = 500) {
     debounceTimer = setTimeout(func, delay);
 }
 
+// Escape HTML for attribute insertion
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 // Auto-update preview on changes
 function setupAutoUpdate() {
     // Update on any input change
@@ -811,6 +821,11 @@ function addVariable(data = null) {
     const isEditMode = {{ edit_mode|default(false) ? 'true' : 'false' }};
     const collapsedClass = isEditMode ? 'collapsed' : '';
     
+    const nameEsc = escapeHtml(data?.name || '');
+    let rawVarValue = data?.value ?? '';
+    if (typeof rawVarValue === 'object') rawVarValue = JSON.stringify(rawVarValue);
+    const valueEsc = escapeHtml(rawVarValue);
+
     const html = `
         <div class="item-card" id="variable-${id}">
             <div class="item-card-header" onclick="toggleInstruction('variable-${id}')">
@@ -824,12 +839,12 @@ function addVariable(data = null) {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" class="input-field" placeholder="my_var" data-var-name="${id}" value="${data?.name || ''}" oninput="updateVariableTitle(${id})" onchange="updateVariableTitle(${id})">
+                        <input type="text" class="input-field" placeholder="my_var" data-var-name="${id}" value="${nameEsc}" oninput="updateVariableTitle(${id})" onchange="updateVariableTitle(${id})">
                         <small>Use without $ in declaration</small>
                     </div>
                     <div class="form-group">
                         <label>Value</label>
-                        <input type="text" class="input-field" placeholder='value or {{ '{{' }} scope {{ '}}' }}' data-var-value="${id}" value="${data?.value || ''}">
+                        <input type="text" class="input-field" placeholder='value or {{ '{{' }} scope {{ '}}' }}' data-var-value="${id}" value="${valueEsc}">
                         <div class="placeholder-hint">Placeholders: {{ '{{' }} scope {{ '}}' }}, {{ '{{' }} uuid {{ '}}' }}, {{ '{{' }} hash('pass') {{ '}}' }}, {{ '{{' }} now {{ '}}' }}, {{ '{{' }} env('VAR') {{ '}}' }}</div>
                     </div>
                 </div>
@@ -947,8 +962,14 @@ function addField(loadId, type, data = null, isEditMode = false) {
     const fieldId = fieldCounter++;
     
     const columnName = data?.name || '';
-    const displayName = columnName ? `<code>${columnName}</code>` : '';
+    const columnNameEsc = escapeHtml(columnName);
+    const displayName = columnName ? `<code>${columnNameEsc}</code>` : '';
     
+    let rawFieldValue = data?.value ?? '';
+    if (typeof rawFieldValue === 'object') rawFieldValue = JSON.stringify(rawFieldValue);
+    const fieldValueEsc = escapeHtml(rawFieldValue);
+    const fieldVarEsc = escapeHtml(data?.var || '');
+
     const html = `
         <div class="item-card field-item" id="field-${fieldId}" style="margin-bottom: 10px;">
             <div class="item-card-header" onclick="toggleInstruction('field-${fieldId}')" style="cursor: pointer;">
@@ -970,9 +991,9 @@ function addField(loadId, type, data = null, isEditMode = false) {
                 </div>
                 <div id="field-${fieldId}-simple" class="form-group">
                     <label>Value</label>
-                    <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }} or {{ '{{' }} uuid {{ '}}' }}' data-field-value="${fieldId}" value="${data?.value || ''}">
+                    <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }} or {{ '{{' }} uuid {{ '}}' }}' data-field-value="${fieldId}" value="${fieldValueEsc}">
                     <label>Export Variable (optional)</label>
-                    <input type="text" class="input-field" placeholder="name_user_1" data-field-var="${fieldId}" value="${data?.var || ''}">
+                    <input type="text" class="input-field" placeholder="name_user_1" data-field-var="${fieldId}" value="${fieldVarEsc}">
                     <div class="placeholder-hint">Examples: {{ '{{' }} scope {{ '}}' }}, {{ '{{' }} uuid {{ '}}' }}, {{ '{{' }} hash('pwd') {{ '}}' }}, {{ '{{' }} now {{ '}}' }}, {{ '{{' }} math(10*2) {{ '}}' }}</div>
                 </div>
                 <div id="field-${fieldId}-lookup" class="form-group" style="display: none;">
@@ -984,7 +1005,7 @@ function addField(loadId, type, data = null, isEditMode = false) {
                     <label>Where Column</label>
                     <input type="text" class="input-field" placeholder="username" data-field-lookup-where-col="${fieldId}" data-autocomplete="column" data-table-ref-lookup="lookup-table-${fieldId}" value="${data?.lookupWhereCol || ''}">
                     <label>Where Value</label>
-                    <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-field-lookup-where-val="${fieldId}" value="${data?.lookupWhereVal || ''}">
+                    <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-field-lookup-where-val="${fieldId}" value="${escapeHtml(data?.lookupWhereVal || '')}">
                     <label>Return Column</label>
                     <input type="text" class="input-field" placeholder="id" data-field-lookup-return="${fieldId}" data-autocomplete="column" data-table-ref-lookup="lookup-table-${fieldId}" value="${data?.lookupReturn || ''}">
                     <label>Export Variable (optional)</label>
@@ -1273,7 +1294,7 @@ function addPurgeField(purgeId, data = null) {
             </div>
             <div id="purge-field-${fieldId}-simple" class="form-group">
                 <label>Value</label>
-                <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-purge-field-value="${fieldId}" value="${data?.value || ''}">
+                <input type="text" class="input-field" placeholder='user_{{ '{{' }} scope {{ '}}' }}' data-purge-field-value="${fieldId}" value="${escapeHtml(typeof data?.value === 'object' ? JSON.stringify(data.value) : (data?.value || ''))}">
             </div>
             <div id="purge-field-${fieldId}-lookup" class="form-group" style="display: none;">
                 <label>Lookup Database (Optional)</label>
