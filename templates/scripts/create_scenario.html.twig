@@ -1945,6 +1945,10 @@ function generateYAML(data) {
         });
         yaml += '\n';
     }
+    else {
+        // Ensure file contains a load section (empty) so loader accepts the prism
+        yaml += 'load: []\n\n';
+    }
     
     // Purge
     if (data.purge.length > 0) {
@@ -1993,10 +1997,7 @@ async function saveScenario() {
             return;
         }
         
-        if (data.load.length === 0) {
-            alert('Please add at least one load instruction');
-            return;
-        }
+        // If no load instructions, we still allow saving; an empty `load: []` will be written.
         
         // Si on est dans un sous-dossier ET en mode création, préfixer le nom avec le chemin
         {% if not edit_mode %}
